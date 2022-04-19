@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "@nomiclabs/hardhat-ganache": "^2.0.1",
+    "@openzeppelin/contracts": "^4.5.0",
     "hardhat": "^2.9.3"
   },
   "devDependencies": {

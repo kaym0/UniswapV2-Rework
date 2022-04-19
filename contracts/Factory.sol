@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Copyright 2022
-pragma solidity ^0.8.12;
+pragma solidity ^0.8.13;
 
-import "./interface/IVSwapV1Pair.sol";
+import "./interface/IVSwapPair.sol";
 import "./utils/Operator.sol";
 
-contract VSwapV1Factory is Operator {
+contract VSwapFactory is Operator {
 
     string public suffix = "VLP";
 
@@ -33,7 +33,7 @@ contract VSwapV1Factory is Operator {
         bytes memory data = _encodeData(token0, token1);
 
         // Initialize Pair contract
-        IVSwapV1Pair(pair).init(data);
+        IVSwapPair(pair).init(data);
 
         // Map pair address
         pairs[token0][token1] = pair;
@@ -90,6 +90,12 @@ contract VSwapV1Factory is Operator {
         return address(0);
     }
 
+    /**
+     *  @dev Creates a ERC1167 minimal proxy of VSwap pair. This is only called in @createPair
+     *  @notice Pair contracts are not initialized by default
+     *  @param implementation - The implementation contract to clone
+     *  @return pair - The newly created pair address
+     */
     function _createMinimalProxy(address implementation) internal returns (address pair) {
         assembly {
             let ptr := mload(0x40)
@@ -102,6 +108,13 @@ contract VSwapV1Factory is Operator {
         require(pair != address(0), "Contract failed to deploy.");
     }
 
+    /**
+     *  @dev ABI Encodes token data to pass into intializer function for newly created pair contracts
+     *  @notice The 4th and 5th arguments here are required only due to minimal proxy lacking state variables
+     *  @param token0 - The address of token0
+     *  @param token1 - The address of token1
+     *  @return data - ABI-encoded data to use when initializing pair contracts.
+     */
     function _encodeData(address token0, address token1) internal view returns (bytes memory) {
         uint unlocked = 1;
         return abi.encodePacked(address(this), token0, token1, true, unlocked);

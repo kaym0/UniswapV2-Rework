@@ -1,7 +1,7 @@
 // SPDX-License-Identifer: Copyright 2022
-pragma solidity ^0.8.12;
+pragma solidity ^0.8.0;
 
-interface IVSwapV1Pair {
+interface IVSwapPair {
     /// Events 
     event Mint(address indexed to, uint amount0, uint amount1);
     event Burn(address indexed from, uint amount0, uint amount1);
