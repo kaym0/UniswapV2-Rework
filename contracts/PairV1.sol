@@ -28,6 +28,10 @@ contract VSwapV1Pair is ERC20 {
     event Burn(address indexed from, uint amount0, uint amount1);
     event Swap(address indexed to, address indexed from, uint amount0, uint amount1);
 
+    error InsufficientAmount(string error);
+    error InsufficientLiquidity(string error);
+    error InvalidRecipient(string error);
+
     modifier lock {
         require(unlocked == 1, "LOCKED");
         unlocked = 0;
@@ -66,6 +70,10 @@ contract VSwapV1Pair is ERC20 {
         return token0.name();
     }
 
+    function name1() public view returns (string memory) {
+        return token1.name();
+    }
+
     function symbol0() public view returns (string memory) {
         return token0.symbol();
     }
@@ -74,9 +82,6 @@ contract VSwapV1Pair is ERC20 {
         return token1.symbol();
     }
 
-    function name1() public view returns (string memory) {
-        return token1.name();
-    }
 
     function decimals0() public view returns (uint8) {
         return token0.decimals();
@@ -116,5 +121,21 @@ contract VSwapV1Pair is ERC20 {
 
     function burn(address to) public lock returns (uint256 assets) {
 
+    }
+
+    /**
+     *  @dev Flashes token to user without the need for an upfront payment. This is the primary mechanism by which
+     *  the VSwap router exchanges tokens during a swap. This can also be used to execute flashswaps.
+     */
+    function flash(uint256 amount0, uint256 amount1, address to, bytes32[] memory data) external lock returns (uint256) {
+        if (amount0 == 0 && amount1 == 0) revert InsufficientAmount("Cannot flash zero");
+        (uint256 reserve0, uint256 reserve1) =  getReserves();
+        if (amount0 > reserve0 || amount1 > reserve1) revert InsufficientLiquidity("Insufficient Liquidity");
+
+        address address0 = address(token0);
+        address address1 = address(token1);
+
+        if (to == address0 && to == address1) revert InvalidRecipient("Invalid Recipient");
+        //if (amount0 > 0) token0.transferFrom(token0, to, amount0);
     }
 }
