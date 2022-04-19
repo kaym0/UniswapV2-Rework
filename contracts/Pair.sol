@@ -25,10 +25,12 @@ contract VSwapPair is ERC20 {
 
     bool initialized;
 
+    /// Events
     event Mint(address indexed to, uint amount0, uint amount1);
     event Burn(address indexed from, uint amount0, uint amount1);
     event Swap(address indexed from, uint amountOut0, uint amountOut1, uint amountIn0, uint amountIn1, address indexed to);
 
+    /// Errors
     error InsufficientAmount(string error);
     error InsufficientLiquidity(string error);
     error InvalidRecipient(string error);
@@ -82,7 +84,6 @@ contract VSwapPair is ERC20 {
     function symbol1() public view returns (string memory) {
         return token1.symbol();
     }
-
 
     function decimals0() public view returns (uint8) {
         return token0.decimals();
@@ -164,14 +165,16 @@ contract VSwapPair is ERC20 {
         uint amountIn0 = balance0 > _reserve0 - amountOut0 ? balance0 - (_reserve0 - amountOut0) : 0;
         uint amountIn1 = balance1 > _reserve1 - amountOut1 ? balance1 - (_reserve1 - amountOut1) : 0;
 
-        require(amountIn0 > 0 || amountIn1 > 0, 'UniswapV2: INSUFFICIENT_INPUT_AMOUNT');
+        require(amountIn0 > 0 || amountIn1 > 0, 'VSwapPair: INSUFFICIENT_INPUT_AMOUNT');
 
         uint balance0Adjusted = (balance0 * 1000) - (amountIn0 * 3);
         uint balance1Adjusted = (balance1 * 1000) - (amountIn1 * 3);
 
-        require(balance0Adjusted * (balance1Adjusted) >= uint(_reserve0) * (_reserve1) * (1000**2), 'UniswapV2: K');
+        require(balance0Adjusted * (balance1Adjusted) >= uint(_reserve0) * (_reserve1) * (1000**2), 'VSwapPair: K');
 
         _update(balance0, balance1, reserve0, reserve1);
         emit Swap(_msgSender(), amountIn0, amountIn1, amountOut0, amountOut1, to);
     }
+
+     function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external lock {}
 }

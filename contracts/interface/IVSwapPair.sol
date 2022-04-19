@@ -1,4 +1,4 @@
-// SPDX-License-Identifer: Copyright 2022
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 interface IVSwapPair {
@@ -28,4 +28,6 @@ interface IVSwapPair {
     function burn(address to) external returns (uint256 assets);
 
     function init(bytes memory) external;
+
+    function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external;
 }
