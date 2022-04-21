@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Copyright 2022
 pragma solidity ^0.8.13;
 
-import "./interface/IVSwapPair.sol";
+import "./interface/IDreamSwapPair.sol";
 import "./utils/Operator.sol";
 
-contract VSwapFactory is Operator {
+contract DreamSwapFactory is Operator {
 
     string public suffix = "VLP";
 
@@ -33,7 +33,7 @@ contract VSwapFactory is Operator {
         bytes memory data = _encodeData(token0, token1);
 
         // Initialize Pair contract
-        IVSwapPair(pair).init(data);
+        IDreamSwapPair(pair).init(data);
 
         // Map pair address
         pairs[token0][token1] = pair;
@@ -91,7 +91,7 @@ contract VSwapFactory is Operator {
     }
 
     /**
-     *  @dev Creates a ERC1167 minimal proxy of VSwap pair. This is only called in @createPair
+     *  @dev Creates a ERC1167 minimal proxy of DreamSwap pair. This is only called in @createPair
      *  @notice Pair contracts are not initialized by default
      *  @param implementation - The implementation contract to clone
      *  @return pair - The newly created pair address

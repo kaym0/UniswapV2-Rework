@@ -11,7 +11,7 @@ contract ERC20 is Context {
 
     mapping(address => mapping(address => uint256)) internal _allowances;
 
-    uint256 public totalSupply;
+    uint256 internal _totalSupply;
 
     string public name;
     string public symbol;
@@ -25,6 +25,10 @@ contract ERC20 is Context {
      */
     function balanceOf(address account) public view virtual returns (uint256) {
         return _balances[account];
+    }
+
+    function totalSupply() public view virtual returns (uint256) {
+        return _totalSupply;
     }
 
     /**
@@ -184,7 +188,7 @@ contract ERC20 is Context {
 
         _beforeTokenTransfer(address(0), account, amount);
 
-        totalSupply += amount;
+        _totalSupply += amount;
         _balances[account] += amount;
         emit Transfer(address(0), account, amount);
 
@@ -212,7 +216,7 @@ contract ERC20 is Context {
         unchecked {
             _balances[account] = accountBalance - amount;
         }
-        totalSupply -= amount;
+        _totalSupply -= amount;
 
         emit Transfer(account, address(0), amount);
 

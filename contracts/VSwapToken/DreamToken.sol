@@ -1,19 +1,26 @@
 // SPDX-License-Identifier: Copyright 2022
 pragma solidity ^0.8.13;
 
-contract VSwapToken {
+import "../utils/Operator.sol";
+import "../token/ERC20/AnyswapV5ERC20.sol";
+
+contract DreamSwapToken is Operator {
 
     uint256 constant MAX_SUPPLY = 1_000_000_000 ether;
-    string public name = "VSwap";
+    string public name = "DreamSwap";
     string public symbol = "VSP";
     uint8 public decimals = 18; 
-    uint256 public totalSupply;
+
+    uint256 internal _totalSupply;
+    uint256 public lockedSupply;
 
     mapping(address => mapping(address => uint256)) private _allowances;
     mapping(address => uint256) public balances;
 
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);
+    event Deposit(address indexed owner, uint256 value);
+    event Withdraw(address indexed owner, uint256 value);
 
     error ZeroAddress(string message);
     error MintExceedsMaximum();
@@ -24,7 +31,6 @@ contract VSwapToken {
     error MintThis();
 
     constructor() {
-
     }
 
     function balanceOf(address account) public view returns (uint256) {
@@ -37,6 +43,10 @@ contract VSwapToken {
 
     function _msgSender() internal view virtual returns (address) {
         return msg.sender;
+    }
+    
+    function totalSupply() public view returns (uint256 supply) {
+        supply = lockedSupply + _totalSupply;
     }
 
     function approve(address to, uint256 amount) public returns (bool) {
@@ -92,10 +102,10 @@ contract VSwapToken {
     function _mint(address to, uint256 amount) internal {
         if (to == address(0)) revert MintZeroAddress();
         if (to == address(this)) revert MintThis();
-        if (totalSupply + amount > MAX_SUPPLY) revert MintExceedsMaximum();
+        if (_totalSupply + amount > MAX_SUPPLY) revert MintExceedsMaximum();
 
         unchecked {
-            totalSupply = totalSupply + amount;
+            _totalSupply = _totalSupply + amount;
             balances[to] = balances[to] + amount;
         }
 
@@ -113,7 +123,7 @@ contract VSwapToken {
             balances[account] = accountBalance - amount;
         }
 
-        totalSupply = totalSupply - amount;
+        _totalSupply = _totalSupply - amount;
 
         emit Transfer(account, address(0), amount);
     }

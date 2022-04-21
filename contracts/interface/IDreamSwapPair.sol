@@ -1,17 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface IVSwapPair {
-    /// Events 
+interface IDreamSwapPair {
+    /// Events
     event Mint(address indexed to, uint amount0, uint amount1);
     event Burn(address indexed from, uint amount0, uint amount1);
-    event Swap(address indexed to, address indexed from, uint amount0, uint amount1);
-
-    function name() external view returns (string memory);
-
-    function symbol() external view returns (string memory);
-
-    function decimals() external view returns (uint8);
+    event Swap(address indexed from, uint amountOut0, uint amountOut1, uint amountIn0, uint amountIn1, address indexed to);
 
     function name0() external view returns (string memory);
 

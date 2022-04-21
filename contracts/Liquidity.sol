@@ -1,25 +1,25 @@
-// SPDX-License-Identifier: Copyright 2022
+// SPDX-License-Identifier: Copyright
 pragma solidity ^0.8.13;
 
-import "./interface/IVSwapPair.sol";
-import "./interface/IVSwapFactory.sol";
+import "./interface/IDreamSwapPair.sol";
+import "./interface/IDreamSwapFactory.sol";
 import "./interface/IWETH.sol";
-import "./libraries/VSwapLibrary.sol";
+import "./libraries/DreamSwapLibrary.sol";
 import "./libraries/TransferHelper.sol";
 import "./utils/Context.sol";
 
-contract VSwapLiquidity is Context {
+contract DreamSwapLiquidity is Context {
 
-    IVSwapFactory public immutable factory;
+    IDreamSwapFactory public immutable factory;
     address public immutable WETH;
 
     constructor(address _factory, address _WETH) {
-        factory = IVSwapFactory(_factory);
+        factory = IDreamSwapFactory(_factory);
         WETH = _WETH;
     }
 
     modifier ensure(uint deadline) {
-        require(deadline >= block.timestamp, 'VSwapLiquidity: EXPIRED');
+        require(deadline >= block.timestamp, 'DreamSwapLiquidity: EXPIRED');
         _;
     }
 
@@ -42,7 +42,7 @@ contract VSwapLiquidity is Context {
         address pair = factory.getPair(tokenA, tokenB);
         TransferHelper.safeTransferFrom(tokenA, msg.sender, pair, amountA);
         TransferHelper.safeTransferFrom(tokenB, msg.sender, pair, amountB);
-        liquidity = IVSwapPair(pair).mint(to);
+        liquidity = IDreamSwapPair(pair).mint(to);
     }
 
     function _addLiquidity(
@@ -53,10 +53,10 @@ contract VSwapLiquidity is Context {
         uint amountAMin,
         uint amountBMin
     ) internal returns (uint256 amountA, uint256 amountB) {
-        IVSwapPair pair;
+        IDreamSwapPair pair;
 
         if (factory.getPair(tokenA, tokenB) == address(0)) {
-            pair = IVSwapPair(factory.createPair(tokenA, tokenB));
+            pair = IDreamSwapPair(factory.createPair(tokenA, tokenB));
         }
 
         (uint reserveA, uint reserveB) = pair.getReserves();
@@ -64,14 +64,14 @@ contract VSwapLiquidity is Context {
         if (reserveA == 0 && reserveB == 0) {
             (amountA, amountB) = (amountADesired, amountBDesired);
         } else {
-            uint amountBOptimal = VSwapLibrary.quote(amountADesired, reserveA, reserveB);
+            uint amountBOptimal = DreamSwapLibrary.quote(amountADesired, reserveA, reserveB);
             if (amountBOptimal <= amountBDesired) {
-                require(amountBOptimal >= amountBMin, 'VSwapLiquidity: INSUFFICIENT_B_AMOUNT');
+                require(amountBOptimal >= amountBMin, 'DreamSwapLiquidity: INSUFFICIENT_B_AMOUNT');
                 (amountA, amountB) = (amountADesired, amountBOptimal);
             } else {
-                uint amountAOptimal = VSwapLibrary.quote(amountBDesired, reserveB, reserveA);
+                uint amountAOptimal = DreamSwapLibrary.quote(amountBDesired, reserveB, reserveA);
                 assert(amountAOptimal <= amountADesired);
-                require(amountAOptimal >= amountAMin, 'VSwapLiquidity: INSUFFICIENT_A_AMOUNT');
+                require(amountAOptimal >= amountAMin, 'DreamSwapLiquidity: INSUFFICIENT_A_AMOUNT');
                 (amountA, amountB) = (amountAOptimal, amountBDesired);
             }
         }
@@ -99,7 +99,7 @@ contract VSwapLiquidity is Context {
         // Deposit call to WETH contract; This takes an input of ETH and wraps it, free of charge         
         IWETH(WETH).deposit{value: amountETH}();
         assert(IWETH(WETH).transfer(pair, amountETH));
-        liquidity = IVSwapPair(pair).mint(to);
+        liquidity = IDreamSwapPair(pair).mint(to);
         // refund dust eth, if any
         if (msg.value > amountETH) TransferHelper.safeTransferETH(_msgSender(), msg.value - amountETH);
     }

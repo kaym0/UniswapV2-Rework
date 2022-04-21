@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Copyright 2022
 pragma solidity 0.8.13;
 
-import "./VSwapToken.sol";
+import "./DreamToken.sol";
 import "../utils/Operator.sol";
-import "../token/ERC20/IERC20.sol";
+//import "../token/ERC20/IERC20.sol";
 
-contract VSwapTokenDistribution is Operator {
+contract DreamSwapTokenDistribution is Operator {
 
     IERC20 vtoken;
 

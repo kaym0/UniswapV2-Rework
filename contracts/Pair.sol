@@ -1,34 +1,32 @@
-// SPDX-License-Identifier: Copyright 2022
+// SPDX-License-Identifier: Copyright
 pragma solidity ^0.8.13;
 
 import "./token/ERC20/ERC20.sol";
 import "./token/ERC20/IERC20.sol";
 import "./utils/Math.sol";
-import "./interface/IVSwapFactory.sol";
-import "./interface/IVSwapFlashee.sol";
+import "./interface/IDreamSwapFactory.sol";
+import "./interface/IDreamSwapFlashee.sol";
+import "./interface/IDreamSwapPair.sol";
 
-contract VSwapPair is ERC20 {
+contract DreamSwapPair is ERC20, IDreamSwapPair {
 
     using Math for uint256;
     IERC20 public token0;
     IERC20 public token1;
 
-    string public override name;
-    string public override symbol = "CLP";
-    uint8 public override decimals;
-
-    IVSwapFactory factory;
+    IDreamSwapFactory factory;
 
     uint256 internal _reserve0;
     uint256 internal _reserve1;
     uint private unlocked;
 
+
     bool initialized;
 
     /// Events
-    event Mint(address indexed to, uint amount0, uint amount1);
-    event Burn(address indexed from, uint amount0, uint amount1);
-    event Swap(address indexed from, uint amountOut0, uint amountOut1, uint amountIn0, uint amountIn1, address indexed to);
+    //event Mint(address indexed to, uint amount0, uint amount1);
+    //event Burn(address indexed from, uint amount0, uint amount1);
+    //event Swap(address indexed from, uint amountOut0, uint amountOut1, uint amountIn0, uint amountIn1, address indexed to);
 
     /// Errors
     error InsufficientAmount(string error);
@@ -53,8 +51,8 @@ contract VSwapPair is ERC20 {
             uint _unlocked
         ) = abi.decode(data, (address, address, address, bool, uint));
 
-        initialized = initialized;
-        factory = IVSwapFactory(_factory);
+        initialized = _initialized;
+        factory = IDreamSwapFactory(_factory);
         token0 = IERC20(_token0);
         token1 = IERC20(_token1);
 
@@ -65,6 +63,10 @@ contract VSwapPair is ERC20 {
                 factory.pairSuffix()
             )
         );
+
+        symbol = "VLP";
+
+        decimals = 18;
 
         unlocked = _unlocked;
     }
@@ -98,12 +100,12 @@ contract VSwapPair is ERC20 {
         reserves1 = _reserve1;
     }
 
-    function mint(address to) public lock returns (uint256 assets) {
+    function mint(address to) public override lock returns (uint256 assets) {
         uint balance0 = IERC20(token0).balanceOf(address(this));
         uint balance1 = IERC20(token1).balanceOf(address(this));
         uint amount0 = balance0 - _reserve0;
         uint amount1 = balance1 - _reserve1;
-        uint256 _totalSupply = totalSupply;
+        uint256 _totalSupply = totalSupply();
 
         if (_totalSupply == 0) {
             assets = Math.sqrt(amount0  * amount1);
@@ -121,7 +123,7 @@ contract VSwapPair is ERC20 {
         emit Mint(to, amount0, amount1);
     }
 
-    function burn(address to) public lock returns (uint256 assets) {
+    function burn(address to) public override lock returns (uint256 assets) {
 
     }
 
@@ -131,7 +133,7 @@ contract VSwapPair is ERC20 {
 
     /**
      *  @dev Flashes token to user without the need for an upfront payment. This is the primary mechanism by which
-     *  the VSwap router exchanges tokens during a swap. This can also be used to execute flashswaps.
+     *  the DreamSwap router exchanges tokens during a swap. This can also be used to execute flashswaps.
 
      *  Requirements:
      *  - Both amount0 and amount1 cannot be equal to 0
@@ -143,7 +145,7 @@ contract VSwapPair is ERC20 {
      *  @param to - The recipient address of flashed tokens
      *  @param data - An abi-encoded execution call
      */
-    function flash(uint256 amountOut0, uint256 amountOut1, address to, bytes memory data) external lock returns (uint256) {
+    function flash(uint256 amountOut0, uint256 amountOut1, address to, bytes memory data) external lock {
         if (amountOut0 == 0 && amountOut1 == 0) revert InsufficientAmount("Cannot flash zero");
         (uint256 reserve0, uint256 reserve1) =  getReserves();
         if (amountOut0 > reserve0 || amountOut1 > reserve1) revert InsufficientLiquidity("Insufficient Liquidity");
@@ -157,7 +159,7 @@ contract VSwapPair is ERC20 {
             if (to == _token0 && to == _token1) revert InvalidRecipient("Invalid Recipient");
             if (amountOut0 > 0) token0.transferFrom(address(this), to, amountOut0);
             if (amountOut1 > 0) token1.transferFrom(address(this), to, amountOut1);
-            if (data.length > 0) IVSwapFlashee(to).flashCallback(_msgSender(), amountOut0, amountOut1, data);
+            if (data.length > 0) IDreamSwapFlashee(to).flashCallback(_msgSender(), amountOut0, amountOut1, data);
             balance0 = IERC20(_token0).balanceOf(address(this));
             balance1 = IERC20(_token1).balanceOf(address(this));
         }
@@ -165,16 +167,18 @@ contract VSwapPair is ERC20 {
         uint amountIn0 = balance0 > _reserve0 - amountOut0 ? balance0 - (_reserve0 - amountOut0) : 0;
         uint amountIn1 = balance1 > _reserve1 - amountOut1 ? balance1 - (_reserve1 - amountOut1) : 0;
 
-        require(amountIn0 > 0 || amountIn1 > 0, 'VSwapPair: INSUFFICIENT_INPUT_AMOUNT');
+        require(amountIn0 > 0 || amountIn1 > 0, 'DreamSwapPair: INSUFFICIENT_INPUT_AMOUNT');
+        {
 
         uint balance0Adjusted = (balance0 * 1000) - (amountIn0 * 3);
         uint balance1Adjusted = (balance1 * 1000) - (amountIn1 * 3);
 
-        require(balance0Adjusted * (balance1Adjusted) >= uint(_reserve0) * (_reserve1) * (1000**2), 'VSwapPair: K');
+        require(balance0Adjusted * (balance1Adjusted) >= uint(_reserve0) * (_reserve1) * (1000**2), 'DreamSwapPair: K');
+        }
 
         _update(balance0, balance1, reserve0, reserve1);
         emit Swap(_msgSender(), amountIn0, amountIn1, amountOut0, amountOut1, to);
     }
 
-     function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external lock {}
+     function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external override lock {}
 }
