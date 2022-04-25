@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Copyright 2022
 pragma solidity ^0.8.13;
 
-import "./interface/IDreamSwapPair.sol";
+import "./interface/IManaSwapPair.sol";
 import "./utils/Operator.sol";
 
-contract DreamSwapFactory is Operator {
+contract ManaSwapFactory is Operator {
 
-    string public suffix = "VLP";
+    string public suffix = "MLP";
+    address public feeTo;
 
     uint256 public liquidityBaseFee = 30;
 
@@ -33,7 +34,9 @@ contract DreamSwapFactory is Operator {
         bytes memory data = _encodeData(token0, token1);
 
         // Initialize Pair contract
-        IDreamSwapPair(pair).init(data);
+        IManaSwapPair(pair).init(data);
+
+        
 
         // Map pair address
         pairs[token0][token1] = pair;
@@ -91,7 +94,7 @@ contract DreamSwapFactory is Operator {
     }
 
     /**
-     *  @dev Creates a ERC1167 minimal proxy of DreamSwap pair. This is only called in @createPair
+     *  @dev Creates a ERC1167 minimal proxy of ManaSwap pair. This is only called in @createPair
      *  @notice Pair contracts are not initialized by default
      *  @param implementation - The implementation contract to clone
      *  @return pair - The newly created pair address
@@ -116,7 +119,7 @@ contract DreamSwapFactory is Operator {
      *  @return data - ABI-encoded data to use when initializing pair contracts.
      */
     function _encodeData(address token0, address token1) internal view returns (bytes memory) {
-        uint unlocked = 1;
-        return abi.encodePacked(address(this), token0, token1, true, unlocked);
+        uint256 unlocked = 1;
+        return abi.encode(address(this), token0, token1, true, unlocked);
     }
 }

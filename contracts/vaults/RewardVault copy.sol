@@ -73,7 +73,7 @@ contract RewardVault is ERC20, IERC4626 {
 
 
     function convertToShares(uint256 assets) public view virtual override returns (uint256) {
-        uint256 value = totalSupply;
+        uint256 value = _totalSupply;
         return value == 0
             ? assets 
             : assets.mulDivDown(value, totalAssets())
@@ -81,7 +81,7 @@ contract RewardVault is ERC20, IERC4626 {
     }
 
     function convertToAssets(uint256 shares) public view virtual override returns (uint256) {
-        uint256 value = totalSupply;
+        uint256 value = _totalSupply;
         return value == 0
             ? shares 
             : shares.mulDivDown(value, totalAssets())
@@ -98,7 +98,7 @@ contract RewardVault is ERC20, IERC4626 {
     }
 
     function previewMint(uint256 shares) public view virtual override returns (uint256) {
-        uint256 value = totalSupply;
+        uint256 value = _totalSupply;
         return value == 0
             ? shares
             : shares.mulDivUp(totalAssets(), value)
@@ -106,7 +106,7 @@ contract RewardVault is ERC20, IERC4626 {
     }
 
     function previewWithdraw(uint256 assets) public view virtual override returns (uint256) {
-        uint256 value = totalSupply;
+        uint256 value = _totalSupply;
         return value == 0
             ? assets 
             : assets.mulDivUp(value, totalAssets())

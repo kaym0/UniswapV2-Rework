@@ -24,8 +24,8 @@ contract RewardVault is ERC20 {
 
     constructor(address assetToken_, address rewardToken_) {
         /// ERC20 setters
-        name = "DreamSwapRewardVault";
-        symbol = "VRV";
+        name = "ManaSwapRewardVault";
+        symbol = "rMana";
         decimals = 18;
 
         assetToken = IERC20(assetToken_);
@@ -69,7 +69,7 @@ contract RewardVault is ERC20 {
 
 
     function convertToShares(uint256 assets) public view virtual  returns (uint256) {
-        uint256 value = totalSupply;
+        uint256 value = _totalSupply;
         return value == 0
             ? assets 
             : assets.mulDivDown(value, totalAssets())
@@ -77,7 +77,7 @@ contract RewardVault is ERC20 {
     }
 
     function convertToAssets(uint256 shares) public view virtual returns (uint256) {
-        uint256 value = totalSupply;
+        uint256 value = _totalSupply;
         return value == 0
             ? shares 
             : shares.mulDivDown(value, totalAssets())
@@ -94,7 +94,7 @@ contract RewardVault is ERC20 {
     }
 
     function previewMint(uint256 shares) public view virtual returns (uint256) {
-        uint256 value = totalSupply;
+        uint256 value = _totalSupply;
         return value == 0
             ? shares
             : shares.mulDivUp(totalAssets(), value)
@@ -102,7 +102,7 @@ contract RewardVault is ERC20 {
     }
 
     function previewWithdraw(uint256 assets) public view virtual returns (uint256) {
-        uint256 value = totalSupply;
+        uint256 value = _totalSupply;
         return value == 0
             ? assets 
             : assets.mulDivUp(value, totalAssets())

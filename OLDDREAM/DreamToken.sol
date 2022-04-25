@@ -4,11 +4,11 @@ pragma solidity ^0.8.13;
 import "../utils/Operator.sol";
 import "../token/ERC20/AnyswapV5ERC20.sol";
 
-contract DreamSwapToken is Operator {
+contract DreamSwapToken {
 
     uint256 constant MAX_SUPPLY = 1_000_000_000 ether;
-    string public name = "DreamSwap";
-    string public symbol = "VSP";
+    string public name = "Dream";
+    string public symbol = "DREAM";
     uint8 public decimals = 18; 
 
     uint256 internal _totalSupply;
@@ -22,7 +22,7 @@ contract DreamSwapToken is Operator {
     event Deposit(address indexed owner, uint256 value);
     event Withdraw(address indexed owner, uint256 value);
 
-    error ZeroAddress(string message);
+    error ZeroAddress();
     error MintExceedsMaximum();
     error InsufficientBalance();
     error InsufficientAllowance();
@@ -129,7 +129,7 @@ contract DreamSwapToken is Operator {
     }
 
     function _transfer(address from, address to, uint256 amount) internal returns (bool) {
-        if (to == address(0)) revert ZeroAddress("Zero addr");
+        if (to == address(0)) revert ZeroAddress();
         if (balances[from] < amount) revert InsufficientBalance();
 
         balances[from] = balances[from] - amount;

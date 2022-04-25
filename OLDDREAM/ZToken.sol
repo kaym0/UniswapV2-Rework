@@ -91,12 +91,20 @@ contract ZToken is ERC20 {
         }
     }
 
-    function rawBalanceOf(address owner) public view returns (uint256) {
-        return _balances[owner];
+    function rawBalanceOf(address owner) public view returns (uint256 _balance) {
+        assembly {
+            mstore(0,owner)
+            mstore(0, _balances.slot)
+            let hash := keccak256(0,64)
+
+            _balance := sload(hash)
+        }
     }
 
-    function totalSupply() public override view returns (uint256) {
-
+    function totalSupply() public override view returns (uint256 supply) {
+        assembly {
+            supply := sload(_totalSupply.slot)
+        }
     }
 
     function deposit(uint256 amount) public {
