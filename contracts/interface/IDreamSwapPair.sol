@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface IManaSwapPair {
+interface IDreamSwapPair {
     /// Events
     event Mint(address indexed to, uint amount0, uint amount1);
     event Burn(address indexed sender, uint amount0, uint amount1, address indexed to);
@@ -20,7 +20,9 @@ interface IManaSwapPair {
 
     function decimals1() external view returns (uint8);
 
-    function getReserves() external view returns (uint112 reserves0, uint112 reserves1, uint32 blockTimestampLast);
+    function getBalances() external view returns (uint256 balance0, uint256 balance1);
+
+    function getReserveBalances() external view returns (uint256 balance0, uint256 balance1);
 
     function mint(address to) external returns (uint256 assets);
     

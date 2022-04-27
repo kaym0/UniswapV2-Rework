@@ -3,41 +3,57 @@ pragma solidity ^0.8.13;
 
 import "./token/ERC20/ERC20.sol";
 import "./token/ERC20/IERC20.sol";
-import "./interface/IManaSwapFactory.sol";
-import "./interface/IManaSwapFlashee.sol";
-import "./interface/IManaSwapPair.sol";
+import "./interface/IDreamSwapFactory.sol";
+import "./interface/IDreamSwapFlashee.sol";
 import "./libraries/Math.sol";
 import "./libraries/UQ112x112.sol";
+import "./libraries/FixedPoint.sol";
 
-contract ManaSwapPair is ERC20, IManaSwapPair {
-
+contract DreamSwapPair is ERC20 {
+    using FixedPointMath for uint256;
     using Math for uint256;
     using UQ112x112 for uint224;
 
-    IManaSwapFactory factory;
+    /// Dreamswap Factory
+    address public factory;
 
+    /// Token addresses 
     IERC20 public token0;
     IERC20 public token1;
 
-    bytes4 private constant SELECTOR = bytes4(keccak256(bytes('transfer(address,uint256)')));
+    /// Pair fee, this is equal to the % multiplied by 100000.
+    /// Therefore, 0.3% = 30;
+    uint256 public fee;
 
-    uint112 internal reserve0;
-    uint112 internal reserve1;
-    uint32  private blockTimestampLast; // uses single storage slot, accessible via getReserves
+    /// Total token amounts in the pool seperated by token type.
+    uint256 public balance0;
+    uint256 public balance1;
 
-    uint public price0CumulativeLast;
-    uint public price1CumulativeLast;
-    uint public kLast; // reserve0 * reserve1, as of immediately after the most recent liquidity event
+    uint256 public priceLastA;
+    uint256 public priceLastB;
 
-    uint private unlocked;
+    uint256 public kLast;
 
+    /// Last time pair updated
+    uint32 public blockTimestampLast;
 
     bool initialized;
+    uint unlocked = 0;
 
     /// Errors
-    error InsufficientAmount(string error);
-    error InsufficientLiquidity(string error);
-    error InvalidRecipient(string error);
+    error InsufficientAmount(string message);
+    error InsufficientBurn(string message);
+    error NoLiquidity(string message);
+    error Overflow(string message);
+    error InsufficientLiquidity(string message);
+    error InvalidRecipient(string message);
+    error KBalance(string message);
+
+
+    event Swap();
+    event Burn(address indexed from, uint256 amountA, uint256 amountB, address indexed to);
+    event Mint(address indexed to, uint256 indexed amountA, uint256 indexed amountB);
+    event Update(uint256 balance0, uint256 balance1, uint256 blockTimestamp);
 
     modifier lock {
         require(unlocked == 1, "LOCKED");
@@ -60,7 +76,7 @@ contract ManaSwapPair is ERC20, IManaSwapPair {
         ) = abi.decode(data, (address, address, address, bool, uint256));
 
         initialized = _initialized;
-        factory = IManaSwapFactory(_factory);
+        factory = _factory;
         token0 = IERC20(_token0);
         token1 = IERC20(_token1);
 
@@ -72,170 +88,193 @@ contract ManaSwapPair is ERC20, IManaSwapPair {
                 "/",
                 token1.symbol(), 
                 " ",
-                factory.suffix()
+                IDreamSwapFactory(factory).suffix()
             )
         );
         
 
-        //name = "Mana LP";
+        //name = "Dream LP";
         symbol = "MSLP"; 
         decimals = 18;
         unlocked = _unlocked;
     
     }
-
-    function name0() public view override returns (string memory) {
+    
+    //////////////////////////////////////////
+    /// Getters for pool token default values
+    //////////////////////////////////////////
+    function name0() public view returns (string memory) {
         return token0.name();
     }
 
-    function name1() public view override returns (string memory) {
+    function name1() public view returns (string memory) {
         return token1.name();
     }
 
-    function symbol0() public view override returns (string memory) {
+    function symbol0() public view returns (string memory) {
         return token0.symbol();
     }
 
-    function symbol1() public view override returns (string memory) {
+    function symbol1() public view returns (string memory) {
         return token1.symbol();
     }
 
-    function decimals0() public view override returns (uint8) {
+    function decimals0() public view returns (uint8) {
         return token0.decimals();
     }
 
-    function decimals1() public view override returns (uint8) {
+    function decimals1() public view returns (uint8) {
         return token1.decimals();
     }
 
-    function getReserves() public view returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) {
-        _reserve0 = reserve0;
-        _reserve1 = reserve1;
-        _blockTimestampLast = blockTimestampLast;
-    }
-
-    function mint(address to) public override lock returns (uint256 assets) {
-        (uint112 _reserve0, uint112 _reserve1,) = getReserves(); 
-        uint balance0 = IERC20(token0).balanceOf(address(this));
-        uint balance1 = IERC20(token1).balanceOf(address(this));
-        uint amount0 = balance0 - _reserve0;
-        uint amount1 = balance1 - _reserve1;
-        uint256 _totalSupply = totalSupply();
-
-        if (_totalSupply == 0) {
-            assets = Math.sqrt(amount0  * amount1);
-        } else {
-            assets = Math.min(
-                (amount0 * _totalSupply) / _reserve0,
-                (amount1 * _totalSupply) / _reserve1
-            );
-        }
-
-        require(assets > 0, "No liquidity");
-
-        _mint(to, assets);
-
-        emit Mint(to, amount0, amount1);
-    }
-
-    function burn(address to) external override lock returns (uint amount0, uint amount1) {
-        (uint112 _reserve0, uint112 _reserve1,) = getReserves(); // gas savings
-        address _token0 = address(token0);                                // gas savings
-        address _token1 = address(token1);                                // gas savings
-        uint balance0 = IERC20(_token0).balanceOf(address(this));
-        uint balance1 = IERC20(_token1).balanceOf(address(this));
-        uint liquidity = balanceOf(address(this));
-
-        bool feeOn = _mintFee(_reserve0, _reserve1);
-        uint _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
-        amount0 = liquidity * (balance0 / _totalSupply); // using balances ensures pro-rata distribution
-        amount1 = liquidity * (balance1 / _totalSupply); // using balances ensures pro-rata distribution
-        require(amount0 > 0 && amount1 > 0, 'UniswapV2: INSUFFICIENT_LIQUIDITY_BURNED');
-        _burn(address(this), liquidity);
-        _safeTransfer(_token0, to, amount0);
-        _safeTransfer(_token1, to, amount1);
-        balance0 = IERC20(_token0).balanceOf(address(this));
-        balance1 = IERC20(_token1).balanceOf(address(this));
-
-        _update(balance0, balance1, _reserve0, _reserve1);
-        if (feeOn) kLast = uint(reserve0) * (reserve1); // reserve0 and reserve1 are up-to-date
-        emit Burn(msg.sender, amount0, amount1, to);
+    /**
+     *  @dev Gets up-to-date pool balances by querying token contracts
+     *  @return balanceA - Balance of token0
+     *  @return balanceB - Balance of token1
+     */
+    function getBalances() public view returns (uint256 balanceA, uint256 balanceB) {
+        balanceA = token0.balanceOf(address(this));
+        balanceB = token1.balanceOf(address(this));
     }
 
     /**
-     *  @dev Flashes token to user without the need for an upfront payment. This is the primary mechanism by which
-     *  the ManaSwap router exchanges tokens during a swap. This can also be used to execute flashswaps.
-
-     *  Requirements:
-     *  - Both amount0 and amount1 cannot be equal to 0
-     *  - Flashed amounts cannot exceed reserves
-     *  - Cannot flash tokens to respective token contracts
+     *  @dev Gets current reserve balances. 
+     *  @notice After adding liquidity, this is unsynced and necessary for mint functionality.
+     *  The primary difference between this and getBalances() is that this returns local state variables,
+     *  whereas the getBalances() function returns balances based on external token contract states.
      *
-     *  @param amountOut0 - The amount of token0 to flash
-     *  @param amountOut1 - The amount of token1 to flash
-     *  @param to - The recipient address of flashed tokens
-     *  @param data - An abi-encoded execution call
+     *  @return balanceA - Balance of token0
+     *  @return balanceB - Balance of token1
      */
-    function flash(uint256 amountOut0, uint256 amountOut1, address to, bytes memory data) external override lock {
-        if (amountOut0 == 0 && amountOut1 == 0) revert InsufficientAmount("Cannot flash zero");
-        (uint112 _reserve0, uint112 _reserve1,) =  getReserves();
-        if (amountOut0 > reserve0 || amountOut1 > reserve1) revert InsufficientLiquidity("Insufficient Liquidity");
-
-        uint balance0;
-        uint balance1;
-
-        {
-            address _token0 = address(token0);
-            address _token1 = address(token1);
-            if (to == _token0 && to == _token1) revert InvalidRecipient("Invalid Recipient");
-            if (amountOut0 > 0) token0.transferFrom(address(this), to, amountOut0);
-            if (amountOut1 > 0) token1.transferFrom(address(this), to, amountOut1);
-            if (data.length > 0) IManaSwapFlashee(to).flashCallback(_msgSender(), amountOut0, amountOut1, data);
-            balance0 = IERC20(_token0).balanceOf(address(this));
-            balance1 = IERC20(_token1).balanceOf(address(this));
-        }
-
-        uint amountIn0 = balance0 > _reserve0 - amountOut0 ? balance0 - (_reserve0 - amountOut0) : 0;
-        uint amountIn1 = balance1 > _reserve1 - amountOut1 ? balance1 - (_reserve1 - amountOut1) : 0;
-
-        require(amountIn0 > 0 || amountIn1 > 0, 'ManaSwapPair: INSUFFICIENT_INPUT_AMOUNT');
-        {
-
-        uint balance0Adjusted = (balance0 * 1000) - (amountIn0 * 3);
-        uint balance1Adjusted = (balance1 * 1000) - (amountIn1 * 3);
-
-        require(balance0Adjusted * (balance1Adjusted) >= uint(_reserve0) * (_reserve1) * (1000**2), 'ManaSwapPair: K');
-        }
-
-        _update(balance0, balance1, _reserve0, _reserve1);
-        emit Swap(_msgSender(), amountIn0, amountIn1, amountOut0, amountOut1, to);
+    function getReserveBalances() public view returns (uint256 balanceA, uint256 balanceB) {
+        balanceA = balance0;
+        balanceB = balance1;
     }
 
-    function _update(uint balance0, uint balance1, uint112 _reserve0, uint112 _reserve1) private {
-        require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, 'UniswapV2: OVERFLOW');
+    function mint(address to) external lock returns (uint256 assets) {
+        
+        /// Fetch state-level balances. After adding liquidity, these values have not yet been updated.
+        (uint256 reserveA, uint256 reserveB) = getReserveBalances();
+
+        /// Fetch balances from token contract. Aftering adding liquidity, these values have changed.
+        (uint256 balanceA, uint256 balanceB) = getBalances();
+
+        /// Subtract the old balances from new balances to see what has been gained.
+        uint256 amountA = balanceA - reserveA;
+        uint256 amountB = balanceB - reserveB;
+
+        /// Current total supply.
+        uint256 _totalSupply = totalSupply();
+
+
+        if (_totalSupply == 0) {
+            assets = Math.sqrt(amountA  * amountB);
+        } else {
+            assets = Math.min(
+                (amountA * _totalSupply) / reserveA,
+                (amountB * _totalSupply) / reserveB
+            );
+        }
+
+        if (assets == 0) revert NoLiquidity("DreamSwap: No Liquidity");
+
+        _mint(to, assets);
+
+        _updateValues(balanceA, balanceB, reserveA, reserveB);
+
+        emit Mint(to, amountA, amountB);
+
+        return 0;
+    }
+
+    function burn(address to) external lock returns (uint256 amountA, uint256 amountB) {
+        /// Get current local balances
+        (uint256 reserveA, uint256 reserveB) = getReserveBalances();
+
+        /// Get external balances
+        (uint256 balanceA, uint256 balanceB) = getBalances();
+
+        /// Get current LP tokens held by this contract
+        uint256 liquidity = balanceOf(address(this));
+
+        bool feeOn = _mintFee(reserveA, reserveB);
+        
+        uint256 supply = totalSupply();
+
+        amountA = liquidity * (balanceA / supply);
+        amountB = liquidity * (balanceB / supply);
+
+        if (amountA == 0 || amountB == 0) revert InsufficientBurn("DreamSwap: Insufficient Amount Burnt");
+
+        _burn(address(this), liquidity);
+
+        token0.transfer(to, amountA);
+        token1.transfer(to, amountB);
+
+        (balanceA, balanceB) = getBalances();
+        _updateValues(balanceA, balanceB, reserveA, reserveB);
+
+        if (feeOn) kLast = reserveA * reserveB; 
+
+        emit Burn(_msgSender(), amountA, amountB, to);
+    }
+
+    function flash(uint256 amountOutA, uint256 amountOutB, address to, bytes memory data) public lock {
+        if (amountOutA == 0 && amountOutB == 0) revert InsufficientAmount("DreamSwap: Cannot flash zero");
+
+        (uint256 reserveA, uint256 reserveB) = getReserveBalances();
+
+        if (amountOutA > balance0 || amountOutB > balance1) revert InsufficientLiquidity("DreamSwap: Insufficent Liquidity");
+
+        uint256 balanceA;
+        uint256 balanceB;
+
+        {
+            require(to != address(token0) && to != address(token1), 'DreamSwap: INVALID_TO');    
+            if (amountOutA > 0) token0.transfer(to, amountOutA);
+            if (amountOutB > 0) token1.transfer(to, amountOutB);
+            if (data.length > 0) IDreamSwapFlashee(to).flashCallback(_msgSender(), amountOutA, amountOutB, data);
+            (balanceA, balanceB) = getBalances();
+        }
+
+        /// Fetch balances post-flash
+        (balanceA, balanceB) = getBalances();
+
+        uint amountInA = balanceA > reserveA - amountOutA ? balanceA - (reserveA - amountOutA) : 0;
+        uint amountInB = balanceB > reserveB - amountOutB ? balanceB - (reserveB - amountOutB) : 0;
+
+
+        require(amountInA > 0 || amountInB > 0, 'DreamSwap: INSUFFICIENT_INPUT_AMOUNT');
+
+        uint256 balanceWithFeeA = (balanceA * 1000) - (amountInA * 3);
+        //uint256 balanceWithFeeA = (balanceA - amountInA) * 10000 /  30;
+        uint256 balanceWithFeeB = (balanceB * 1000) - (amountInB * 3);
+        //uint256 balanceWithFeeB = (balanceB - amountInB) * 10000 / 30;
+
+        //if (balanceWithFeeA * balanceWithFeeB >= (reserveA * reserveB) * (1000**2)) revert KBalance("DreamSwap: K");
+
+        _updateValues(balanceA, balanceB, balance0, balance1);
+    }
+
+    function _updateValues(uint256 _balanceA, uint256 _balanceB, uint256 initialBalanceA, uint256 initialBalanceB) private {
+        if (_balanceA >= type(uint256).max || _balanceB >= type(uint256).max) revert Overflow("DreamSwap: Overflow");
 
         uint32 blockTimestamp = uint32(block.timestamp % 2**32);
-        uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
+        uint32 timeElapsed = blockTimestamp - blockTimestampLast;
 
-        if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
-            // * never overflows, and + overflow is desired
-            price0CumulativeLast += uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) * timeElapsed;
-            price1CumulativeLast += uint(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) * timeElapsed;
+        if (timeElapsed > 0 && initialBalanceA > 0 && initialBalanceB > 0) {
+            /// Stuff here
         }
 
-        reserve0 = uint112(balance0);
-        reserve1 = uint112(balance1);
-        blockTimestampLast = blockTimestamp;
-        emit Sync(reserve0, reserve1);
+        balance0 = _balanceA;
+        balance1 = _balanceB;
+
+        emit Update(_balanceA, _balanceB, blockTimestamp);
     }
 
-    function _safeTransfer(address token, address to, uint value) private {
-        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(SELECTOR, to, value));
-        require(success && (data.length == 0 || abi.decode(data, (bool))), 'UniswapV2: TRANSFER_FAILED');
-    }
 
-    function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool feeOn) {
-        address feeTo = IManaSwapFactory(factory).feeTo();
+    function _mintFee(uint256 _reserve0, uint256 _reserve1) private returns (bool feeOn) {
+        address feeTo = IDreamSwapFactory(factory).feeTo();
         feeOn = feeTo != address(0);
         uint _kLast = kLast; // gas savings
         if (feeOn) {

@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: Copyright 2022
 pragma solidity ^0.8.13;
 
-import "./interface/IManaSwapPair.sol";
+import "./interface/IDreamSwapPair.sol";
 import "./utils/Operator.sol";
 
-contract ManaSwapFactory is Operator {
+contract DreamSwapFactory is Operator {
 
-    string public suffix = "MLP";
+    string public suffix = "DLP";
+
     address public feeTo;
 
     uint256 public liquidityBaseFee = 30;
 
-    address _implementation;
+    address public _implementation;
 
     mapping (address => mapping(address => address)) pairs;
 
@@ -34,7 +35,7 @@ contract ManaSwapFactory is Operator {
         bytes memory data = _encodeData(token0, token1);
 
         // Initialize Pair contract
-        IManaSwapPair(pair).init(data);
+        IDreamSwapPair(pair).init(data);
 
         
 
@@ -64,8 +65,12 @@ contract ManaSwapFactory is Operator {
     /**
      *  @dev Updates the pair token name suffix. This is cosmetic only.
      */
-    function updatePairPrefix(string memory _suffix) public onlyOperator {
+    function updatePairSuffix(string memory _suffix) public onlyOperator {
         suffix = _suffix;
+    }
+
+    function updateFeeTo(address account) public onlyOperator {
+        feeTo = account;
     }
     
     /**
@@ -94,7 +99,7 @@ contract ManaSwapFactory is Operator {
     }
 
     /**
-     *  @dev Creates a ERC1167 minimal proxy of ManaSwap pair. This is only called in @createPair
+     *  @dev Creates a ERC1167 minimal proxy of DreamSwap pair. This is only called in @createPair
      *  @notice Pair contracts are not initialized by default
      *  @param implementation - The implementation contract to clone
      *  @return pair - The newly created pair address
