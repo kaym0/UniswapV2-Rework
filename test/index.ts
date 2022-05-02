@@ -56,7 +56,7 @@ describe("Main", function () {
 
         const Factory = await ethers.getContractFactory("DreamSwapFactory");
         const Token = await ethers.getContractFactory("TestToken");
-        const Weth = await ethers.getContractFactory("TestWeth");
+        const Weth = await ethers.getContractFactory("WETH");
         Pair = await ethers.getContractFactory("DreamSwapPair", {
             libraries: {
                 Math: mathlib.address,
@@ -71,9 +71,9 @@ describe("Main", function () {
         accounts = _accounts.map((account: any) => account.address);
 
         /// Deploy test tokens
-        wmatic = await deployToken("Wrapped Matic", "Wmatic", Token);
-        link = await deployToken("Chainlink", "Link", Token);
-        weth = await deployContract(Weth, ["Wrapped Matic", "WMATIC"]);
+        wmatic = await deployToken("Wrapped Matic", "WMATIC", Token);
+        link = await deployToken("ChainLink", "Link", Token);
+        weth = await deployContract(Weth);
 
         /// Deploy infrastructure
         factory = await deployContract(Factory);
@@ -81,8 +81,18 @@ describe("Main", function () {
         router = await deployContract(Router, [factory.address, weth.address]);
         liquidity = await deployContract(Liquidity, [factory.address, weth.address]);
 
-        /// Add some ETH to weth contract so withdraws work properly.
-        await weth.connect(_accounts[9]).addEth({ value: toWei(99)});
+        /// Sends ETH to fallback function
+        const tx = await _accounts[9].sendTransaction({
+            to: weth.address,
+            value: ethers.utils.parseEther("99"), // Sends exactly 1.0 ether
+        });
+
+        await tx.wait();
+        const wethEthBalance = await ethers.provider.getBalance(weth.address);
+        console.log(fromWei(wethEthBalance.toString()));
+        console.log("Router", router.address);
+        console.log("User", accounts[0]);
+        console.log("weth", weth.address);
     });
 
     describe("DreamSwapFactory", async () => {
@@ -121,6 +131,16 @@ describe("Main", function () {
                 expect(pair).to.equal(zeroAddress);
             });
         });
+
+        describe("allPairs", async () => {
+            it("Fetches all currently available liquidity pairs", async () => {
+                const pairs = await factory.allPairs();
+
+                const _pair = await factory.getPair(wmatic.address, link.address);
+
+                expect(pairs[0]).to.equal(_pair);
+            });
+        });
     });
 
     describe("DreamSwapLiquidity", async () => {
@@ -151,13 +171,13 @@ describe("Main", function () {
             it("successfully adds liquidity to empty pool", async () => {
                 const tx = await liquidity.addLiquidityETH(
                     wmatic.address,
-                    toWei("100"),
-                    toWei("100"),
-                    toWei("100"),
+                    toWei("50"),
+                    toWei("50"),
+                    toWei("50"),
                     accounts[0],
                     deadline,
                     {
-                        value: toWei("100"),
+                        value: toWei("50"),
                     }
                 );
 
@@ -167,8 +187,8 @@ describe("Main", function () {
                 const pair = Pair.attach(_pairAddress);
                 const reserves = await pair.getReserveBalances();
 
-                expect(reserves[0]).to.equal(toWei("100"));
-                expect(reserves[1]).to.equal(toWei("100"));
+                expect(reserves[0]).to.equal(toWei("50"));
+                expect(reserves[1]).to.equal(toWei("50"));
             });
         });
     });
@@ -180,6 +200,82 @@ describe("Main", function () {
                 expect(balances[0]).to.equal(toWei("100"));
             });
         });
+
+        describe("token0", async () => {
+            it("Returns correct address", async () => {
+                const token0 = await pair.token0();
+                expect(token0).to.equal(wmatic.address);
+            });
+        });
+
+        describe("token1", async () => {
+            it("Returns correct address", async () => {
+                const token1 = await pair.token1();
+                expect(token1).to.equal(link.address);
+            });
+        });
+
+        describe("name0", async () => {
+            it("Returns the correct name", async () => {
+                const name0 = await pair.name0();
+                expect(name0).to.equal("Wrapped Matic");
+            });
+        });
+
+        describe("name1", async () => {
+            it("Returns the correct name", async () => {
+                const name1 = await pair.name1();
+                expect(name1).to.equal("ChainLink");
+            });
+        });
+
+        describe("symbol0", async () => {
+            it("Returns the correct symbol", async () => {
+                const symbol0 = await pair.symbol0();
+                expect(symbol0).to.equal("WMATIC");
+            });
+        });
+
+        describe("symbol1", async () => {
+            it("Returns the correct symbol", async () => {
+                const symbol1 = await pair.symbol1();
+                expect(symbol1).to.equal("Link");
+            });
+        });
+
+        describe("decimals0", async () => {
+            it("Returns correct decimals", async () => {
+                const decimals0 = await pair.decimals0();
+                expect(decimals0).to.equal(18);
+            });
+        });
+
+        describe("decimals1", async () => {
+            it("Returns correct decimals", async () => {
+                const decimals1 = await pair.decimals1();
+                expect(decimals1).to.equal(18);
+            });
+        });
+
+        describe("getBalances", async () => {
+            it("Fetches balances", async () => {
+                const balances = await pair.getBalances();
+                const [balances0, balances1] = balances;
+
+                expect(balances0).to.equal(toWei("100"));
+                expect(balances1).to.equal(toWei("100"));
+            });
+        });
+
+        describe("getReserves", async () => {
+            it("Fetches reserve balances", async () => {
+                const reserves = await pair.getReserveBalances();
+                const [reserve0, reserve1] = reserves;
+
+                expect(reserve0).to.equal(toWei("100"));
+                expect(reserve1).to.equal(toWei("100"));
+            });
+        });
     });
 
     describe("DreamSwapRouter", async () => {
@@ -187,6 +283,13 @@ describe("Main", function () {
             await wmatic.approve(router.address, toWei("10000000000000000000000000"));
             await link.approve(router.address, toWei("10000000000000000000000000"));
             await weth.approve(router.address, toWei("10000000000000000000000000"));
+            await pair.approve(router.address, toWei("10000000000000000000000000"));
+
+            const ethBalanceRouter = await ethers.provider.getBalance(router.address);
+            const wethBalanceRouter = await weth.balanceOf(router.address);
+
+            console.log("ethBalanceRouter", ethBalanceRouter);
+            console.log("wethBalanceRouter", wethBalanceRouter);
         });
         describe("swapExactTokensForTokens", async () => {
             it("Successfully swaps using correct parameters", async () => {
@@ -239,6 +342,84 @@ describe("Main", function () {
                 console.log(amountsOutMin);
 
                 const tx = await router.swapExactETHForTokens(
+                    amountsOutMin[1],
+                    path,
+                    accounts[0],
+                    deadline,
+                    {
+                        value: toWei("5"),
+                    }
+                );
+
+                await tx.wait();
+            });
+        });
+
+        // function swapTokensForExactETH(uint amountOut, uint amountInMax, address[] calldata path, address to, uint deadline)
+        describe("swapTokensForExactETH", async () => {
+            it("Successfully swaps using correct parameters", async () => {
+                const amountOutDesired = toWei("5");
+
+                const path = [wmatic.address, weth.address];
+
+                const amountsInMax = await router.getAmountsIn(amountOutDesired, path);
+
+                const tx = await router.swapTokensForExactETH(
+                    amountOutDesired,
+                    amountsInMax[0],
+                    path,
+                    accounts[0],
+                    deadline
+                );
+
+                await tx.wait();
+            });
+        });
+
+        describe("swapExactTokensForETH", async () => {
+            it("Successfully swaps exact tokens for eth", async () => {
+                const userEthBalanceA = await ethers.provider.getBalance(accounts[0]);
+                const userWethBalanceA = await weth.balanceOf(accounts[0]);
+                const amountIn = toWei("5");
+
+                const path = [wmatic.address, weth.address];
+
+                const amountsOutMin = await router.getAmountsOut(amountIn, path);
+
+                const tx = await router.swapExactTokensForETH(
+                    amountIn,
+                    amountsOutMin[1],
+                    path,
+                    accounts[0],
+                    deadline
+                );
+
+                await tx.wait();
+
+                const userEthBalanceB = await ethers.provider.getBalance(accounts[0]);
+                const userWethBalanceB = await weth.balanceOf(accounts[0]);
+
+                const routerEthBalance = await ethers.provider.getBalance(router.address);
+                const routerWethBalance = await weth.balanceOf(router.address);
+
+                console.log("userEthBalanceA", fromWei(userEthBalanceA.toString()));
+                console.log("userEthBalanceB", fromWei(userEthBalanceB.toString()));
+                console.log("userWethBalanceA", fromWei(userWethBalanceA.toString()));
+                console.log("userWethBalanceB", fromWei(userWethBalanceB.toString()));
+                console.log(fromWei(routerEthBalance.toString()));
+                console.log(fromWei(routerWethBalance.toString()));
+            });
+        });
+
+        describe("swapETHForExactTokens", async () => {
+            it("Successfully swaps exact tokens for eth", async () => {
+                const amountInDesired = toWei("5");
+
+                const path = [weth.address, wmatic.address];
+
+                const amountsOutMin = await router.getAmountsOut(amountInDesired, path);
+
+                const tx = await router.swapETHForExactTokens(
                     amountsOutMin[1],
                     path,
                     accounts[0],

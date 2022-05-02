@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Copyright 2022
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
 import "./interface/IDreamSwapPair.sol";
@@ -6,7 +6,7 @@ import "./utils/Operator.sol";
 
 contract DreamSwapFactory is Operator {
 
-    string public suffix = "DLP";
+    string public suffix = "DLP"; // Dreamswap LP
 
     address public feeTo;
 
@@ -14,10 +14,20 @@ contract DreamSwapFactory is Operator {
 
     address public _implementation;
 
-    mapping (address => mapping(address => address)) pairs;
+    mapping (address => mapping(address => address)) public pairs;
 
-    event NewPair (address indexed token0, address indexed token1, address indexed pair);
-    event FeeChange(address indexed operator, uint256 indexed fee);
+    address[] private _allPairs;
+
+    event PairCreated (address indexed token0, address indexed token1, address pair, uint256 index);
+    event FeeChange (address indexed operator, uint256 indexed fee);
+
+
+    /**
+     *  @dev Returns all pairs as an array
+     */
+    function allPairs() public view returns (address[] memory) {
+        return _allPairs;
+    }
 
     /**
      *  @dev Creates a new pair if one does not already exist
@@ -27,7 +37,8 @@ contract DreamSwapFactory is Operator {
      *  @return pair - The new pair address
      */
     function createPair(address token0, address token1) public returns (address pair) {
-        require(_checkIfPairExists(token0, token1) == address(0), "Pair already exists");
+        require(_getExistingPair(token0, token1) == address(0), "Pair already exists");
+
         // Create minimal proxy 
         pair = _createMinimalProxy(_implementation);
 
@@ -37,13 +48,13 @@ contract DreamSwapFactory is Operator {
         // Initialize Pair contract
         IDreamSwapPair(pair).init(data);
 
-        
-
-        // Map pair address
+        // Map pair address to both possible inputs
         pairs[token0][token1] = pair;
+        pairs[token1][token0] = pair;
+        _allPairs.push(pair);
 
         // Emit event stating new pair exists
-        emit NewPair(token0, token1, pair);
+        emit PairCreated (token0, token1, pair, _allPairs.length);
     }
 
     /**
@@ -52,7 +63,7 @@ contract DreamSwapFactory is Operator {
      *  @return pair - the pair address
      */
     function getPair(address token0, address token1) public view returns (address pair) {
-        pair = _checkIfPairExists(token0, token1);
+        pair = _getExistingPair(token0, token1);
     }
 
     /**
@@ -78,7 +89,7 @@ contract DreamSwapFactory is Operator {
      *  @notice This can be set to a maximum of 5%, but the intention is that it will never be close to that high.
      */
     function updateLiquidityBaseFee(uint256 fee) public onlyOperator {
-        require(fee < 500, "Fee cannot be larger than 5%");
+        require(fee <= 500, "Fee cannot be larger than 5%");
 
         liquidityBaseFee = fee;
 
@@ -90,7 +101,7 @@ contract DreamSwapFactory is Operator {
      *  @notice This returns the zero address if no pair is found.
      *  @return pair - The pair address
      */
-    function _checkIfPairExists(address token0, address token1) internal view returns (address pair) {
+    function _getExistingPair(address token0, address token1) internal view returns (address pair) {
         if (pairs[token0][token1] != address(0)) return pairs[token0][token1];
 
         if (pairs[token1][token0] != address(0)) return pairs[token1][token0];
@@ -118,13 +129,19 @@ contract DreamSwapFactory is Operator {
 
     /**
      *  @dev ABI Encodes token data to pass into intializer function for newly created pair contracts
-     *  @notice The 4th and 5th arguments here are required only due to minimal proxy lacking state variables
+     *  @notice The 4th and 5th arguments here are required only due to minimal proxy lacking initial state variables
      *  @param token0 - The address of token0
      *  @param token1 - The address of token1
      *  @return data - ABI-encoded data to use when initializing pair contracts.
      */
     function _encodeData(address token0, address token1) internal view returns (bytes memory) {
         uint256 unlocked = 1;
-        return abi.encode(address(this), token0, token1, true, unlocked);
+        return abi.encode(
+            address(this), 
+            token0, 
+            token1, 
+            true, 
+            unlocked
+        );
     }
 }

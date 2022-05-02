@@ -4,7 +4,12 @@ import { DreamSwapFactory } from "../typechain/DreamSwapFactory";
 import { DreamSwapLiquidity } from "../typechain/DreamSwapLiquidity";
 import { DreamSwapPair } from "../typechain/DreamSwapPair";
 
-async function main() {
+
+const WETH = {
+    // Rinkeby
+    address: "0xc778417e063141139fce010982780140aa0cd5ab"
+}
+ async function main() {
     /// const signers = await ethers.getSigners();
     /// const _accounts = signers;
     /// const accounts: string[] = _accounts.map((account) => account.address);

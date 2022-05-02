@@ -50,7 +50,14 @@ contract DreamSwapPair is ERC20 {
     error KBalance(string message);
 
 
-    event Swap();
+    event Swap(
+        address indexed from, 
+        uint amount0In,
+        uint amount1In,
+        uint amount0Out,
+        uint amount1Out,
+        address indexed to
+    );
     event Burn(address indexed from, uint256 amountA, uint256 amountB, address indexed to);
     event Mint(address indexed to, uint256 indexed amountA, uint256 indexed amountB);
     event Update(uint256 balance0, uint256 balance1, uint256 blockTimestamp);
@@ -94,7 +101,7 @@ contract DreamSwapPair is ERC20 {
         
 
         //name = "Dream LP";
-        symbol = "MSLP"; 
+        symbol = "DSLP"; 
         decimals = 18;
         unlocked = _unlocked;
     
@@ -156,7 +163,8 @@ contract DreamSwapPair is ERC20 {
         /// Fetch state-level balances. After adding liquidity, these values have not yet been updated.
         (uint256 reserveA, uint256 reserveB) = getReserveBalances();
 
-        /// Fetch balances from token contract. Aftering adding liquidity, these values have changed.
+        /// Fetch balances from token contract. Aftering adding liquidity, these values have changed while
+        /// balances from getReserveBalances() still reflect previous, unupdated values.
         (uint256 balanceA, uint256 balanceB) = getBalances();
 
         /// Subtract the old balances from new balances to see what has been gained.
@@ -243,17 +251,19 @@ contract DreamSwapPair is ERC20 {
         uint amountInA = balanceA > reserveA - amountOutA ? balanceA - (reserveA - amountOutA) : 0;
         uint amountInB = balanceB > reserveB - amountOutB ? balanceB - (reserveB - amountOutB) : 0;
 
-
         require(amountInA > 0 || amountInB > 0, 'DreamSwap: INSUFFICIENT_INPUT_AMOUNT');
 
-        uint256 balanceWithFeeA = (balanceA * 1000) - (amountInA * 3);
-        //uint256 balanceWithFeeA = (balanceA - amountInA) * 10000 /  30;
-        uint256 balanceWithFeeB = (balanceB * 1000) - (amountInB * 3);
-        //uint256 balanceWithFeeB = (balanceB - amountInB) * 10000 / 30;
+        {
+            uint256 balanceWithFeeA = (balanceA * 1000) - (amountInA * 3);
+            uint256 balanceWithFeeB = (balanceB * 1000) - (amountInB * 3);
+        
+            if (balanceWithFeeA * balanceWithFeeB < (reserveA * reserveB) * (1000**2)) revert KBalance("DreamSwap: K");
+        }
+            //require(balanceWithFeeA * balanceWithFeeB >= (reserveA  * reserveB) * (1000**2), 'UniswapV2: K');
 
-        //if (balanceWithFeeA * balanceWithFeeB >= (reserveA * reserveB) * (1000**2)) revert KBalance("DreamSwap: K");
+            _updateValues(balanceA, balanceB, balance0, balance1);
 
-        _updateValues(balanceA, balanceB, balance0, balance1);
+        emit Swap(_msgSender(), amountInA, amountInB, amountOutA, amountOutB, to);
     }
 
     function _updateValues(uint256 _balanceA, uint256 _balanceB, uint256 initialBalanceA, uint256 initialBalanceB) private {

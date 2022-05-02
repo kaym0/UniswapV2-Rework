@@ -12,14 +12,15 @@ import "./libraries/TransferHelper.sol";
 contract DreamSwapRouter {
 
     address public immutable factory;
-    address public immutable WETH;
+    address payable public immutable WETH;
 
 
     error InsufficientOutputAmount(string message);
     error ExcessiveInputAmount(string message);
     error InvalidPath(string message);
+    error Exacting(string message);
 
-    constructor(address _factory, address _WETH) {
+    constructor(address _factory, address payable _WETH) {
         factory = _factory;
         WETH = _WETH;
     }
@@ -32,11 +33,6 @@ contract DreamSwapRouter {
     function _msgSender() private view returns (address) {
         return msg.sender;
     }
-
-    function swapEthForTokens() public {}
-
-    function swapTokensForEth() public {}
-
 
     /**
      *  @dev Swaps tokens by iterating through an array of addresses
@@ -60,16 +56,42 @@ contract DreamSwapRouter {
                 ? (uint(0), amountOut) 
                 : (amountOut, uint(0));
 
-            address to = i < path.length - 2 ? DreamSwapLibrary.getPair(factory, output, path[i + 2]) : _to;
-            //address to = i < path.length - 2 
-            //    ? DreamSwapLibrary.pairFor(address(factory), output, path[i + 2]) 
-            //    : _to;
+            address to = i < path.length - 2 
+                ? DreamSwapLibrary.getPair(factory, output, path[i + 2]) 
+                : _to;
 
             /// Execute flash/swap
             IDreamSwapPair(IDreamSwapFactory(factory).getPair(input, output)).flash(
                 amount0Out, amount1Out, to, new bytes(0)
             );
         }
+    }
+
+
+    function swap(
+        uint256 amountIn,
+        uint256 amountOut,
+        uint exacting,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) public ensure(deadline) returns (uint256[] memory amounts) {
+        if (exacting > 1) revert Exacting("DreamSwap: exacting should be set to either 0 or 1.");
+
+        /// Check if swaps requires WETH before proceeding to token-only transactions
+        if (path[0] == WETH) {
+            return swapExactETHForTokens(amountOut, path, to, deadline);
+        }
+
+        if (path[path.length -1] == WETH) {
+            return swapTokensForExactETH(amountOut, amountIn, path, to, deadline);
+        }
+
+        if (exacting == 0) {
+            return swapExactTokensForTokens(amountIn, amountOut, path, to, deadline);
+        }
+
+        return swapTokensForExactTokens(amountOut, amountIn, path, to, deadline);
     }
 
     /**
@@ -89,17 +111,13 @@ contract DreamSwapRouter {
         uint deadline
     ) public ensure(deadline) returns (uint256[] memory amounts) {
         
-        /// Checks amounts
+        /// Get amounts
         amounts = DreamSwapLibrary.getAmountsOut(address(factory), amountIn, path);
 
         /// Check here if the trade is possible, revert if not.
-        //require(amounts[amounts.length -1] >= amountOutMin, "DreamSwap: Insufficent Output Amount");
         if (amounts[amounts.length - 1] < amountOutMin) revert InsufficientOutputAmount("DreamSwap: Insufficent Output Amount");
 
-        /// Trade looks okay. Execute transfer.
-
-        //IERC20(path[0]).transferFrom(msg.sender, DreamSwapLibrary.getPair(address(factory), path[0], path[1]), amounts[0]);
-
+        /// Execute transfer.
         TransferHelper.safeTransferFrom(    
             path[0], msg.sender, DreamSwapLibrary.getPair(address(factory), path[0], path[1]), amounts[0]
         );
@@ -123,7 +141,7 @@ contract DreamSwapRouter {
         address[] calldata path,
         address to,
         uint deadline
-    ) external virtual ensure(deadline) returns (uint256[] memory amounts) {
+    ) public virtual ensure(deadline) returns (uint256[] memory amounts) {
         /// Fetch amounts
         amounts = DreamSwapLibrary.getAmountsIn(address(factory), amountOut, path);
 
@@ -153,21 +171,19 @@ contract DreamSwapRouter {
      *  which would execute later than they should.
      */
     function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline)
-        external
+        public
         virtual
         payable
         ensure(deadline)
         returns (uint[] memory amounts)
     {
         /// If the first swapped token is not ETH we revert, since this is not the correct function.
-        require(path[0] == WETH, "Dreamswap: Invalid Path");
         if (path[0] != WETH) revert InvalidPath("DreamSwap: Invalid Path");
 
         /// Fetch amounts using input values
         amounts = DreamSwapLibrary.getAmountsOut(factory, msg.value, path);
 
         /// If amount is less than amountOutMin, we revert.
-        require(amounts[amounts.length -1] >= amountOutMin, "DreamSwap: Insufficent Output Amount");
         if (amounts[amounts.length -1] < amountOutMin) revert InsufficientOutputAmount("DreamSwap: Insufficent Output Amount");
         
         /// Wraps ETH
@@ -181,7 +197,7 @@ contract DreamSwapRouter {
     }
 
     function swapTokensForExactETH(uint amountOut, uint amountInMax, address[] calldata path, address to, uint deadline)
-        external virtual ensure(deadline) returns (uint[] memory amounts) 
+        public virtual ensure(deadline) returns (uint[] memory amounts) 
     {
         require(path[path.length - 1] == WETH, 'DreamSwap: INVALID_PATH');
 
@@ -192,10 +208,59 @@ contract DreamSwapRouter {
         TransferHelper.safeTransferFrom(
             path[0], msg.sender, DreamSwapLibrary.getPair(factory, path[0], path[1]), amounts[0]
         );
-        
+
         _swap(amounts, path, address(this));
+
         IWETH(WETH).withdraw(amounts[amounts.length - 1]);
+
         TransferHelper.safeTransferETH(to, amounts[amounts.length - 1]);
+    }
+
+    function swapExactTokensForETH(
+        uint amountIn, 
+        uint amountOutMin, 
+        address[] calldata path, 
+        address to, 
+        uint deadline
+    ) external virtual ensure(deadline) returns (uint[] memory amounts) {
+        require(path[path.length - 1] == WETH, 'DreamSwap: INVALID_PATH');
+
+        amounts = DreamSwapLibrary.getAmountsOut(factory, amountIn, path);
+
+        require(amounts[amounts.length - 1] >= amountOutMin, 'DreamSwap: INSUFFICIENT_OUTPUT_AMOUNT');
+
+        TransferHelper.safeTransferFrom(
+            path[0], msg.sender, DreamSwapLibrary.getPair(factory, path[0], path[1]), amounts[0]
+        );
+
+        _swap(amounts, path, address(this));
+
+        
+        IWETH(WETH).withdraw(amounts[amounts.length - 1]);
+
+        TransferHelper.safeTransferETH(to, amounts[amounts.length - 1]);
+        
+    }
+
+    function swapETHForExactTokens(
+        uint amountOut, 
+        address[] calldata path, 
+        address to, 
+        uint deadline
+    ) external virtual payable ensure(deadline) returns (uint[] memory amounts) {
+        require(path[0] == WETH, 'DreamSwap: INVALID_PATH');
+
+        amounts = DreamSwapLibrary.getAmountsIn(factory, amountOut, path);
+
+        require(amounts[0] <= msg.value, 'DreamSwap: EXCESSIVE_INPUT_AMOUNT');
+
+        IWETH(WETH).deposit{value: amounts[0]}();
+
+        assert(IWETH(WETH).transfer(DreamSwapLibrary.getPair(factory, path[0], path[1]), amounts[0]));
+        
+        _swap(amounts, path, to);
+
+        if (msg.value > amounts[0]) TransferHelper.safeTransferETH(msg.sender, msg.value - amounts[0]);
     }
 
 
@@ -225,5 +290,9 @@ contract DreamSwapRouter {
 
     function getAmountsIn(uint amountOut, address[] memory path) public view virtual returns (uint256[] memory amounts) {
         return DreamSwapLibrary.getAmountsIn(factory, amountOut, path);
+    }
+
+    receive() external payable {
+        assert(msg.sender == WETH); // only accept ETH via fallback from the WETH contract
     }
 }

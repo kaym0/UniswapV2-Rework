@@ -11,9 +11,9 @@ import "./utils/Context.sol";
 contract DreamSwapLiquidity is Context {
 
     IDreamSwapFactory public immutable factory;
-    address public immutable WETH;
+    address payable public immutable WETH;
 
-    constructor(address _factory, address _WETH) {
+    constructor(address _factory, address payable _WETH) {
         factory = IDreamSwapFactory(_factory);
         WETH = _WETH;
     }
@@ -96,10 +96,14 @@ contract DreamSwapLiquidity is Context {
         );
 
         address pair = factory.getPair(token, WETH);
+        
         TransferHelper.safeTransferFrom(token, _msgSender(), pair, amountToken);
-        // Deposit call to WETH contract; This takes an input of ETH and wraps it, free of charge         
+        // Deposit call to WETH contract; This takes an input of ETH and wraps it, free of charge    
+
         IWETH(WETH).deposit{value: amountETH}();
+
         assert(IWETH(WETH).transfer(pair, amountETH));
+
         liquidity = IDreamSwapPair(pair).mint(to);
         // refund dust eth, if any
         if (msg.value > amountETH) TransferHelper.safeTransferETH(_msgSender(), msg.value - amountETH);
