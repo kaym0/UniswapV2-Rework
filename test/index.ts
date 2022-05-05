@@ -21,6 +21,52 @@ describe("Main", function () {
     let _accounts: any;
     let accounts: any;
 
+    async function getAllBalances() {
+        const addresses = [
+            accounts[0],
+            accounts[1],
+            accounts[2],
+            accounts[3],
+            accounts[4],
+            pair.address,
+        ];
+
+        const data: any = [];
+
+        const fetchBalances = new Promise((resolve: any, reject) => {
+            let resolved = 0;
+            addresses.forEach(async (account, i) => {
+                const u = await getBalances(account, "user" + i);
+                data.push(u);
+                resolved++;
+                if (resolved == addresses.length) {
+                    resolve();
+                }
+            });
+        });
+
+        await fetchBalances;
+
+        console.table(data);
+    }
+
+    async function getBalances(address: string, name: string) {
+        const wmaticBalance = await wmatic.balanceOf(address);
+        const linkBalance = await link.balanceOf(address);
+        const pairBalance = await pair.balanceOf(address);
+
+        const data = {
+            name: name,
+            wmatic: fromWei(wmaticBalance),
+            link: fromWei(linkBalance),
+            lp: fromWei(pairBalance),
+        };
+
+        console.table(data);
+
+        return data;
+    }
+
     const advanceOneWeek = async (account: any, Fn: any) => {
         const oneWeek = 86400 * 7;
         await advanceTimeAndBlock(oneWeek, ethers);
@@ -204,42 +250,42 @@ describe("Main", function () {
         describe("token0", async () => {
             it("Returns correct address", async () => {
                 const token0 = await pair.token0();
-                expect(token0).to.equal(wmatic.address);
+                expect(token0).to.equal(link.address);
             });
         });
 
         describe("token1", async () => {
             it("Returns correct address", async () => {
                 const token1 = await pair.token1();
-                expect(token1).to.equal(link.address);
+                expect(token1).to.equal(wmatic.address);
             });
         });
 
         describe("name0", async () => {
             it("Returns the correct name", async () => {
                 const name0 = await pair.name0();
-                expect(name0).to.equal("Wrapped Matic");
+                expect(name0).to.equal("ChainLink");
             });
         });
-
+        
         describe("name1", async () => {
             it("Returns the correct name", async () => {
                 const name1 = await pair.name1();
-                expect(name1).to.equal("ChainLink");
+                expect(name1).to.equal("Wrapped Matic");
             });
         });
 
         describe("symbol0", async () => {
             it("Returns the correct symbol", async () => {
                 const symbol0 = await pair.symbol0();
-                expect(symbol0).to.equal("WMATIC");
+                expect(symbol0).to.equal("Link");
             });
         });
-
+        
         describe("symbol1", async () => {
             it("Returns the correct symbol", async () => {
                 const symbol1 = await pair.symbol1();
-                expect(symbol1).to.equal("Link");
+                expect(symbol1).to.equal("WMATIC");
             });
         });
 
@@ -291,12 +337,37 @@ describe("Main", function () {
             console.log("ethBalanceRouter", ethBalanceRouter);
             console.log("wethBalanceRouter", wethBalanceRouter);
         });
+
+        describe("getAmountsOut", async () => {
+            it("Successfully gets a result", async () => {
+                const amountIn = toWei("5");
+                const path = [wmatic.address, link.address];
+
+                const amountsOutMin = await router.getAmountsOut(amountIn, path);
+            });
+        });
+
+        describe("getAmountsIn", async () => {
+            it("Successfully gets a result", async () => {
+                const amountIn = toWei("5");
+                const path = [wmatic.address, link.address];
+
+                const amountsOutMin = await router.getAmountsOut(amountIn, path);
+            });
+        });
         describe("swapExactTokensForTokens", async () => {
             it("Successfully swaps using correct parameters", async () => {
                 const amountIn = toWei("5");
                 const path = [wmatic.address, link.address];
 
                 const amountsOutMin = await router.getAmountsOut(amountIn, path);
+
+                const pair = await factory.getPair(wmatic.address, link.address);
+
+
+                console.log("amountsOutMin", amountsOutMin)
+                await getBalances(accounts[0], "account0");
+                await getBalances(pair, "account0");
 
                 const tx = await router.swapExactTokensForTokens(
                     amountIn,
@@ -307,6 +378,9 @@ describe("Main", function () {
                 );
 
                 await tx.wait();
+
+                await getBalances(accounts[0], "account0");
+                await getBalances(pair, "account0");
             });
         });
 
@@ -338,8 +412,6 @@ describe("Main", function () {
                 const path = [weth.address, wmatic.address];
 
                 const amountsOutMin = await router.getAmountsOut(amountIn, path);
-
-                console.log(amountsOutMin);
 
                 const tx = await router.swapExactETHForTokens(
                     amountsOutMin[1],

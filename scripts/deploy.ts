@@ -32,10 +32,10 @@ const WETH = {
     /// Deploy Router
     const router = await deployRouter();
 
-    console.log("Factory:             ", factory.address);
-    console.log("Pair:                ", pair.address);
-    console.log("Liquidity:           ", liquidity.address);
-    console.log("Router:              ", router.address);
+    console.log("Pair:                          ", pair.address);
+    console.log("REACT_APP_FACTORY=             ", factory.address);
+    console.log("REACT_APP_LIQUIDITY=           ", liquidity.address)
+    console.log("REACT_APP_ROUTER=              ", router.address);
 
 
 

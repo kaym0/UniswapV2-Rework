@@ -46,6 +46,7 @@ contract DreamSwapRouter {
             (address input, address output) = (path[i], path[i + 1]);
 
             /// Get address token0
+            //(address token0,) = DreamSwapLibrary.sortTokens(input, output);
             (address token0,) = DreamSwapLibrary.sortTokens(input, output);
 
             /// Amount out for swap
@@ -272,19 +273,19 @@ contract DreamSwapRouter {
      *  @param reserveB - The total reserves for tokenB.
      *  @return amountB - The expected output amount given the input values
      */
-    function quote(uint amountA, uint reserveA, uint reserveB) public pure virtual returns (uint amountB) {
+    function quote(uint amountA, uint reserveA, uint reserveB) public pure virtual returns (uint256 amountB) {
         return DreamSwapLibrary.quote(amountA, reserveA, reserveB);
     }
 
-    function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) public pure virtual returns (uint amountOut) {
+    function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) public pure virtual returns (uint256 amountOut) {
         return DreamSwapLibrary.getAmountOut(amountIn, reserveIn, reserveOut);
     }
 
-    function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut) public pure virtual returns (uint amountIn) {
+    function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut) public pure virtual returns (uint256 amountIn) {
         return DreamSwapLibrary.getAmountIn(amountOut, reserveIn, reserveOut);
     }
 
-    function getAmountsOut(uint amountIn, address[] memory path) public view virtual returns (uint[] memory amounts) {
+    function getAmountsOut(uint amountIn, address[] memory path) public view virtual returns (uint256[] memory amounts) {
         return DreamSwapLibrary.getAmountsOut(factory, amountIn, path);
     }
 

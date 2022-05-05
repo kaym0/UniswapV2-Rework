@@ -39,6 +39,9 @@ contract DreamSwapFactory is Operator {
     function createPair(address token0, address token1) public returns (address pair) {
         require(_getExistingPair(token0, token1) == address(0), "Pair already exists");
 
+        //(address tokenA, address tokenB) = token0 < token1 ? (token0, token1) : (token1, token0);
+
+        (token0, token1) = token0 < token1 ? (token0, token1) : (token1, token0);
         // Create minimal proxy 
         pair = _createMinimalProxy(_implementation);
 

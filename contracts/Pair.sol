@@ -256,12 +256,12 @@ contract DreamSwapPair is ERC20 {
         {
             uint256 balanceWithFeeA = (balanceA * 1000) - (amountInA * 3);
             uint256 balanceWithFeeB = (balanceB * 1000) - (amountInB * 3);
-        
+            
             if (balanceWithFeeA * balanceWithFeeB < (reserveA * reserveB) * (1000**2)) revert KBalance("DreamSwap: K");
         }
             //require(balanceWithFeeA * balanceWithFeeB >= (reserveA  * reserveB) * (1000**2), 'UniswapV2: K');
 
-            _updateValues(balanceA, balanceB, balance0, balance1);
+        _updateValues(balanceA, balanceB, reserveA, reserveB);
 
         emit Swap(_msgSender(), amountInA, amountInB, amountOutA, amountOutB, to);
     }
