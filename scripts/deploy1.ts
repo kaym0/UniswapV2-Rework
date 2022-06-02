@@ -17,7 +17,7 @@ async function main() {
     const factory = await deployFactory();
 
     /// Deploy Libraries for Pair
-    //const lib = await deployLibraries();
+    /// const lib = await deployLibraries();
 
     /// Deploy Pair Implementation
     const pair = await deployPairImplementation();
@@ -25,16 +25,16 @@ async function main() {
     /// Set PAIR implementation in Factory
     await factory.setImplementation(pair.address);
 
-    /// Deploy Liquidity Management Contract
-    const liquidity = await deployLiquidityManagement();
 
-    /// Deploy Router
-    const router = await deployRouter();
+    const compute = await deployCompute();
+
+    const creationCodeHash = await compute.getHashedCode(pair.address);
+    const creationCodeHashFactory = await factory.getHashedCode(pair.address);
 
     console.log("Pair:                          ", pair.address);
     console.log("REACT_APP_FACTORY=             ", factory.address);
-    console.log("REACT_APP_LIQUIDITY=           ", liquidity.address);
-    console.log("REACT_APP_ROUTER=              ", router.address);
+    console.log("Init Code Hash:                ", creationCodeHash)
+    console.log("Factory Code Hash:             ", creationCodeHashFactory)
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +62,7 @@ async function main() {
         return pair;
     }
 
-    async function deployFactory(): Promise<DreamSwapFactory | Contract> {
+    async function deployFactory(): Promise<Contract> {
         const Factory = await ethers.getContractFactory("ToknFactory");
         const factory = await Factory.deploy();
 
@@ -71,28 +71,13 @@ async function main() {
         return factory;
     }
 
-    async function deployLiquidityManagement(): Promise<DreamSwapLiquidity | Contract> {
-        const Liquidity = await ethers.getContractFactory("ToknLiquidity");
-        const liquidity = await Liquidity.deploy(factory.address, pair.address);
-        await liquidity.deployed();
+    async function deployCompute(): Promise<Contract> {
+        const Compute = await ethers.getContractFactory("Compute");
+        const compute = await Compute.deploy();
 
-        return liquidity;
-    }
+        await factory.deployed();
 
-    async function deployRouter() {
-        const Router = await ethers.getContractFactory("ToknRouter");
-        const router = await Router.deploy(factory.address, WETH.address);
-        await router.deployed();
-
-        return router;
-    }
-
-    async function deployLibraries() {
-        const Math = await ethers.getContractFactory("Math");
-        const math = await Math.deploy();
-        await math.deployed();
-
-        return math;
+        return compute;
     }
 }
 

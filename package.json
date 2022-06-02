@@ -12,7 +12,8 @@
     "@nomiclabs/hardhat-ganache": "^2.0.1",
     "@openzeppelin/contracts": "^4.5.0",
     "hardhat": "^2.9.3",
-    "hardhat-tracer": "^1.1.0-rc.3"
+    "hardhat-tracer": "^1.1.0-rc.3",
+    "keccak256": "^1.0.6"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.0",

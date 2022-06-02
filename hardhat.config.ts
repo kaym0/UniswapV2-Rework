@@ -7,6 +7,7 @@ import "hardhat-gas-reporter";
 import "solidity-coverage";
 import "hardhat-tracer";
 import "@nomiclabs/hardhat-ganache";
+import { ethers } from "hardhat";
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
   }
 });
 
+
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
 
@@ -36,16 +38,17 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
-    hardhat: {},
+    hardhat: {
+    },
     localhost: {
       url: "http://localhost:8545",
+      accounts: [key]
     },
     ganache: {
       url: "http://localhost:8545",
     },
     mainnet: {
       url: process.env.MAINNET || "",
-      accounts: [key],
     },
     harmony: {
       url: process.env.HARMONY || "",

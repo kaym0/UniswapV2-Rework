@@ -9,30 +9,20 @@ const WETH = {
     address: "0xc778417e063141139fce010982780140aa0cd5ab",
 };
 async function main() {
-    /// const signers = await ethers.getSigners();
-    /// const _accounts = signers;
-    /// const accounts: string[] = _accounts.map((account) => account.address);
 
-    /// Deploy factory
-    const factory = await deployFactory();
+    const factory = {
+        address: "0x0C0F6F22b34d22f3f99D388760cb0b7c5326D12B"
+    }
 
-    /// Deploy Libraries for Pair
-    //const lib = await deployLibraries();
+    const pair = {
+        address: "0xdDbC07a5289fe236b835a55cc8c9dEEf615d8F48"
+    }
 
-    /// Deploy Pair Implementation
-    const pair = await deployPairImplementation();
-
-    /// Set PAIR implementation in Factory
-    await factory.setImplementation(pair.address);
-
-    /// Deploy Liquidity Management Contract
     const liquidity = await deployLiquidityManagement();
 
     /// Deploy Router
     const router = await deployRouter();
 
-    console.log("Pair:                          ", pair.address);
-    console.log("REACT_APP_FACTORY=             ", factory.address);
     console.log("REACT_APP_LIQUIDITY=           ", liquidity.address);
     console.log("REACT_APP_ROUTER=              ", router.address);
 
@@ -48,28 +38,6 @@ async function main() {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    async function deployPairImplementation(): Promise<DreamSwapPair | Contract> {
-        /*
-        const Pair = await ethers.getContractFactory("DreamSwapPair", {
-            libraries: {
-                Math: lib.address,
-            },
-        });
-        */
-        const Pair = await ethers.getContractFactory("ToknPair");
-        const pair = await Pair.deploy();
-        await pair.deployed();
-        return pair;
-    }
-
-    async function deployFactory(): Promise<DreamSwapFactory | Contract> {
-        const Factory = await ethers.getContractFactory("ToknFactory");
-        const factory = await Factory.deploy();
-
-        await factory.deployed();
-
-        return factory;
-    }
 
     async function deployLiquidityManagement(): Promise<DreamSwapLiquidity | Contract> {
         const Liquidity = await ethers.getContractFactory("ToknLiquidity");
@@ -85,14 +53,6 @@ async function main() {
         await router.deployed();
 
         return router;
-    }
-
-    async function deployLibraries() {
-        const Math = await ethers.getContractFactory("Math");
-        const math = await Math.deploy();
-        await math.deployed();
-
-        return math;
     }
 }
 

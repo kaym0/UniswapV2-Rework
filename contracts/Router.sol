@@ -9,11 +9,10 @@ import "./token/ERC20/IERC20.sol";
 import "./libraries/DreamSwapLibrary.sol";
 import "./libraries/TransferHelper.sol";
 
-contract DreamSwapRouter {
+contract ToknRouter {
 
     address public immutable factory;
     address payable public immutable WETH;
-
 
     error InsufficientOutputAmount(string message);
     error ExcessiveInputAmount(string message);
@@ -58,11 +57,11 @@ contract DreamSwapRouter {
                 : (amountOut, uint(0));
 
             address to = i < path.length - 2 
-                ? DreamSwapLibrary.getPair(factory, output, path[i + 2]) 
+                ? DreamSwapLibrary.pairFor(factory, output, path[i + 2]) 
                 : _to;
 
             /// Execute flash/swap
-            IDreamSwapPair(IDreamSwapFactory(factory).getPair(input, output)).flash(
+            IDreamSwapPair(DreamSwapLibrary.pairFor(factory, input, output)).flash(
                 amount0Out, amount1Out, to, new bytes(0)
             );
         }
@@ -89,7 +88,7 @@ contract DreamSwapRouter {
         }
 
         if (exacting == 0) {
-            return swapExactTokensForTokens(amountIn, amountOut, path, to, deadline);
+            //return swapExactTokensForTokens(amountIn, amountOut, path, to, deadline);
         }
 
         return swapTokensForExactTokens(amountOut, amountIn, path, to, deadline);
@@ -104,6 +103,7 @@ contract DreamSwapRouter {
      *  @param deadline - The time at which this swap expires. Useful for period of high gas fees or network lag to prevent trades
      *  which would execute later than they should.
      */
+    
     function swapExactTokensForTokens(  
         uint amountIn,
         uint amountOutMin,
@@ -120,12 +120,14 @@ contract DreamSwapRouter {
 
         /// Execute transfer.
         TransferHelper.safeTransferFrom(    
-            path[0], msg.sender, DreamSwapLibrary.getPair(address(factory), path[0], path[1]), amounts[0]
+            path[0], msg.sender, DreamSwapLibrary.pairFor(address(factory), path[0], path[1]), amounts[0]
         );
 
         /// Execute flash/swap.
         _swap(amounts, path, to);
     }
+
+
 
     /**
      *  @dev Swaps ERC20 tokens for an exact number of output tokens.
@@ -147,18 +149,15 @@ contract DreamSwapRouter {
         amounts = DreamSwapLibrary.getAmountsIn(address(factory), amountOut, path);
 
         /// if amounts[0] is greater than amountInMax, we revert.
-        require(amounts[0] <= amountInMax, "Dreamswap: Excessive Input Amount");
-
         if (amounts[0] > amountInMax) revert ExcessiveInputAmount("DreamSwap: Excessive Input Amount");
 
         /// Transfer tokens here.
         TransferHelper.safeTransferFrom(
-            path[0], _msgSender(), DreamSwapLibrary.getPair(address(factory), path[0], path[1]), amounts[0]
+            path[0], _msgSender(), DreamSwapLibrary.pairFor(address(factory), path[0], path[1]), amounts[0]
         );
 
         /// Execute flash/swap.
         _swap(amounts, path, to);
-
     }
 
 
@@ -191,7 +190,7 @@ contract DreamSwapRouter {
         IWETH(WETH).deposit{value: amounts[0]}();
 
         /// Ensure that the transfer executes successfully
-        assert(IWETH(WETH).transfer(DreamSwapLibrary.getPair(factory, path[0], path[1]), amounts[0]));
+        assert(IWETH(WETH).transfer(DreamSwapLibrary.pairFor(factory, path[0], path[1]), amounts[0]));
 
         /// Execute flash/swap.
         _swap(amounts, path, to);
@@ -207,7 +206,7 @@ contract DreamSwapRouter {
         require(amounts[0] <= amountInMax, 'DreamSwap: EXCESSIVE_INPUT_AMOUNT');
 
         TransferHelper.safeTransferFrom(
-            path[0], msg.sender, DreamSwapLibrary.getPair(factory, path[0], path[1]), amounts[0]
+            path[0], msg.sender, DreamSwapLibrary.pairFor(factory, path[0], path[1]), amounts[0]
         );
 
         _swap(amounts, path, address(this));
@@ -231,7 +230,7 @@ contract DreamSwapRouter {
         require(amounts[amounts.length - 1] >= amountOutMin, 'DreamSwap: INSUFFICIENT_OUTPUT_AMOUNT');
 
         TransferHelper.safeTransferFrom(
-            path[0], msg.sender, DreamSwapLibrary.getPair(factory, path[0], path[1]), amounts[0]
+            path[0], msg.sender, DreamSwapLibrary.pairFor(factory, path[0], path[1]), amounts[0]
         );
 
         _swap(amounts, path, address(this));
@@ -257,7 +256,7 @@ contract DreamSwapRouter {
 
         IWETH(WETH).deposit{value: amounts[0]}();
 
-        assert(IWETH(WETH).transfer(DreamSwapLibrary.getPair(factory, path[0], path[1]), amounts[0]));
+        assert(IWETH(WETH).transfer(DreamSwapLibrary.pairFor(factory, path[0], path[1]), amounts[0]));
         
         _swap(amounts, path, to);
 

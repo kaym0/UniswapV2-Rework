@@ -9,9 +9,7 @@ import "./libraries/Math.sol";
 import "./libraries/UQ112x112.sol";
 import "./libraries/FixedPoint.sol";
 
-contract DreamSwapPair is ERC20 {
-    using FixedPointMath for uint256;
-    using Math for uint256;
+contract ToknPair is ERC20 {
     using UQ112x112 for uint224;
 
     /// Dreamswap Factory
@@ -58,9 +56,11 @@ contract DreamSwapPair is ERC20 {
         uint amount1Out,
         address indexed to
     );
+    
     event Burn(address indexed from, uint256 amountA, uint256 amountB, address indexed to);
     event Mint(address indexed to, uint256 indexed amountA, uint256 indexed amountB);
-    event Update(uint256 balance0, uint256 balance1, uint256 blockTimestamp);
+    event Update(uint256 balance0, uint256 balance1);
+ 
 
     modifier lock {
         require(unlocked == 1, "LOCKED");
@@ -209,8 +209,8 @@ contract DreamSwapPair is ERC20 {
         
         uint256 supply = totalSupply();
 
-        amountA = liquidity * (balanceA / supply);
-        amountB = liquidity * (balanceB / supply);
+        amountA = (liquidity * balanceA) / supply;
+        amountB = (liquidity * balanceB) / supply;
 
         if (amountA == 0 || amountB == 0) revert InsufficientBurn("DreamSwap: Insufficient Amount Burnt");
 
@@ -238,7 +238,8 @@ contract DreamSwapPair is ERC20 {
         uint256 balanceB;
 
         {
-            require(to != address(token0) && to != address(token1), 'DreamSwap: INVALID_TO');    
+            //if(to != address(token0) && to != address(token1), 'DreamSwap: INVALID_TO');    
+            if(to == address(token0) || to == address(token1)) revert InvalidRecipient("Tokn: INVALID TO");
             if (amountOutA > 0) token0.transfer(to, amountOutA);
             if (amountOutB > 0) token1.transfer(to, amountOutB);
             if (data.length > 0) IDreamSwapFlashee(to).flashCallback(_msgSender(), amountOutA, amountOutB, data);
@@ -251,12 +252,13 @@ contract DreamSwapPair is ERC20 {
         uint amountInA = balanceA > reserveA - amountOutA ? balanceA - (reserveA - amountOutA) : 0;
         uint amountInB = balanceB > reserveB - amountOutB ? balanceB - (reserveB - amountOutB) : 0;
 
-        require(amountInA > 0 || amountInB > 0, 'DreamSwap: INSUFFICIENT_INPUT_AMOUNT');
+        //require(amountInA > 0 || amountInB > 0, 'DreamSwap: INSUFFICIENT_INPUT_AMOUNT');
+        if (amountInA == 0 && amountInB == 0) revert InsufficientAmount("Tokn: INSUFFICIENT AMOUNT");
 
         {
             uint256 balanceWithFeeA = (balanceA * 1000) - (amountInA * 3);
             uint256 balanceWithFeeB = (balanceB * 1000) - (amountInB * 3);
-            
+
             if (balanceWithFeeA * balanceWithFeeB < (reserveA * reserveB) * (1000**2)) revert KBalance("DreamSwap: K");
         }
             //require(balanceWithFeeA * balanceWithFeeB >= (reserveA  * reserveB) * (1000**2), 'UniswapV2: K');
@@ -279,7 +281,7 @@ contract DreamSwapPair is ERC20 {
         balance0 = _balanceA;
         balance1 = _balanceB;
 
-        emit Update(_balanceA, _balanceB, blockTimestamp);
+        emit Update(balance0, balance1);
     }
 
 

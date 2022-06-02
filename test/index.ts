@@ -100,16 +100,17 @@ describe("Main", function () {
         const Math = await ethers.getContractFactory("Math");
         mathlib = await deployContract(Math);
 
-        const Factory = await ethers.getContractFactory("DreamSwapFactory");
+        const Factory = await ethers.getContractFactory("ToknFactory");
         const Token = await ethers.getContractFactory("TestToken");
         const Weth = await ethers.getContractFactory("WETH");
-        Pair = await ethers.getContractFactory("DreamSwapPair", {
-            libraries: {
-                Math: mathlib.address,
-            },
-        });
-        const Router = await ethers.getContractFactory("DreamSwapRouter");
-        const Liquidity = await ethers.getContractFactory("DreamSwapLiquidity");
+        Pair = await ethers.getContractFactory("ToknPair");
+        //Pair = await ethers.getContractFactory("DreamSwapPair", {
+        //    libraries: {
+        //        Math: mathlib.address,
+        //    },
+        //});
+        const Router = await ethers.getContractFactory("ToknRouter");
+        const Liquidity = await ethers.getContractFactory("ToknLiquidity");
 
         /// Get signers
         [..._accounts] = await ethers.getSigners();
@@ -127,13 +128,15 @@ describe("Main", function () {
         router = await deployContract(Router, [factory.address, weth.address]);
         liquidity = await deployContract(Liquidity, [factory.address, weth.address]);
 
+        /*
         /// Sends ETH to fallback function
         const tx = await _accounts[9].sendTransaction({
             to: weth.address,
             value: ethers.utils.parseEther("99"), // Sends exactly 1.0 ether
         });
+        */
 
-        await tx.wait();
+        //await tx.wait();
         const wethEthBalance = await ethers.provider.getBalance(weth.address);
         console.log(fromWei(wethEthBalance.toString()));
         console.log("Router", router.address);
@@ -167,10 +170,23 @@ describe("Main", function () {
         describe("getPair", async () => {
             it("Gets valid pair successfully", async () => {
                 const pairAddress = await factory.getPair(wmatic.address, link.address);
+
                 expect(pairAddress).to.not.equal(zeroAddress);
 
                 pair = Pair.attach(pairAddress);
             });
+
+            /*
+
+            THIS IS FOR GETTING THE PROPER INIT CODE HASH
+            it("Tests the salting", async () => {
+                const saltA = await factory.computeAndSaltAddress(pairImplementation.address, wmatic.address, link.address);
+                const saltB = await factory.computeAndSaltAddress(pairImplementation.address, link.address, wmatic.address);
+
+                console.log(saltA);
+                console.log(saltB);
+            });
+            */
 
             it("Correctly gets invalid pair as zero address", async () => {
                 const pair = await factory.getPair(wmatic.address, weth.address);
@@ -267,7 +283,7 @@ describe("Main", function () {
                 expect(name0).to.equal("ChainLink");
             });
         });
-        
+
         describe("name1", async () => {
             it("Returns the correct name", async () => {
                 const name1 = await pair.name1();
@@ -281,7 +297,7 @@ describe("Main", function () {
                 expect(symbol0).to.equal("Link");
             });
         });
-        
+
         describe("symbol1", async () => {
             it("Returns the correct symbol", async () => {
                 const symbol1 = await pair.symbol1();
@@ -364,8 +380,7 @@ describe("Main", function () {
 
                 const pair = await factory.getPair(wmatic.address, link.address);
 
-
-                console.log("amountsOutMin", amountsOutMin)
+       
                 await getBalances(accounts[0], "account0");
                 await getBalances(pair, "account0");
 
@@ -468,18 +483,6 @@ describe("Main", function () {
 
                 await tx.wait();
 
-                const userEthBalanceB = await ethers.provider.getBalance(accounts[0]);
-                const userWethBalanceB = await weth.balanceOf(accounts[0]);
-
-                const routerEthBalance = await ethers.provider.getBalance(router.address);
-                const routerWethBalance = await weth.balanceOf(router.address);
-
-                console.log("userEthBalanceA", fromWei(userEthBalanceA.toString()));
-                console.log("userEthBalanceB", fromWei(userEthBalanceB.toString()));
-                console.log("userWethBalanceA", fromWei(userWethBalanceA.toString()));
-                console.log("userWethBalanceB", fromWei(userWethBalanceB.toString()));
-                console.log(fromWei(routerEthBalance.toString()));
-                console.log(fromWei(routerWethBalance.toString()));
             });
         });
 
@@ -504,5 +507,29 @@ describe("Main", function () {
                 await tx.wait();
             });
         });
+
+        describe("removeLiquidity", async () => {
+            it("Removes liquidity", async () => {
+                await pair.approve(liquidity.address, "100000000000000000000000000000000000000")
+
+                await liquidity.removeLiquidity(
+                    wmatic.address,
+                    link.address,
+                    toWei(5),
+                    "0",
+                    "0",
+                    accounts[0],
+                    deadline
+                )
+            })
+        })
+
+
+        describe("computeAndSaltAddress", async () => {
+            it("Gets hashed creation code", async () => {
+                const data = await factory.computeAndSaltAddress(pairImplementation.address, wmatic.address, link.address);
+                console.log(data);
+            })
+        })
     });
 });

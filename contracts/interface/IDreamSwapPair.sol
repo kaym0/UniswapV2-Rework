@@ -31,4 +31,12 @@ interface IDreamSwapPair {
     function init(bytes memory) external;
 
     function flash(uint amount0Out, uint amount1Out, address to, bytes calldata data) external;
+
+    function approve(address spender, uint value) external returns (bool);
+
+    function transfer(address to, uint value) external returns (bool);
+
+    function transferFrom(address from, address to, uint value) external returns (bool);
+
+    function permit(address owner, address spender, uint value, uint deadline, uint8 v, bytes32 r, bytes32 s) external;
 }

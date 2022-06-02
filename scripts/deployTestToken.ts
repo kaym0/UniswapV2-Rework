@@ -11,7 +11,7 @@ async function main() {
     const chung = await Token.deploy("Chung", "Chungus");
     await chung.deployed();
 
-    const dude = await Token.deploy("Dude", "dude");
+    const dude = await Token.deploy("Vampire Survivors", "VAMPS");
     await dude.deployed();
 
     console.log("TokenA:             ", chung.address);
